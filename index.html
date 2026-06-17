@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Golden Temple — 46,656 Ways</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Cinzel+Decorative:wght@700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="filter-defs"></div>
+
+  <div id="stage">
+    <!-- ===================== GAME SCREEN ===================== -->
+    <div id="game" class="screen">
+
+      <!-- decorative temple frame -->
+      <div class="pillar left"  id="pillarL"></div>
+      <div class="pillar right" id="pillarR"></div>
+      <div class="torch torch-tl" id="torchTL"></div>
+      <div class="torch torch-tr" id="torchTR"></div>
+      <div class="torch torch-bl" id="torchBL"></div>
+      <div class="torch torch-br" id="torchBR"></div>
+      <div class="character" id="character"></div>
+
+      <!-- top bar -->
+      <header class="topbar">
+        <div class="logo">
+          <span class="logo-golden">Golden</span>
+          <span class="logo-temple">Temple</span>
+        </div>
+        <button class="icon-btn info-btn" id="btnRules" title="Game rules" aria-label="Game rules">&#9432;</button>
+      </header>
+
+      <!-- free game banner -->
+      <div class="free-banner" id="freeBanner" hidden>
+        <span class="fg-label">FREE GAME</span>
+        <span class="fg-count"><b id="fgLeft">0</b> LEFT</span>
+        <span class="fg-mult">x<b id="fgMult">1</b></span>
+      </div>
+
+      <!-- reels -->
+      <main class="board-wrap">
+        <div class="board-frame">
+          <div class="board" id="board"></div>
+          <div class="cascade-fx" id="cascadeFx"></div>
+        </div>
+        <div class="ways-bar">
+          <span class="ways-num" id="waysNum">4,096</span>
+          <span class="ways-label">WAYS</span>
+        </div>
+        <div class="win-pop" id="winPop"></div>
+      </main>
+
+      <!-- bottom HUD -->
+      <footer class="hud">
+        <div class="meter balance">
+          <div class="meter-top"><span class="lvl">LV.0</span> Balance</div>
+          <div class="meter-val">Rs <span id="balVal">50,000.00</span></div>
+        </div>
+
+        <div class="bet-block">
+          <button class="round-btn small" id="betMinus" aria-label="Decrease bet">&minus;</button>
+          <div class="bet-info">
+            <div class="bet-label">Bet</div>
+            <div class="bet-val">Rs <span id="betVal">3</span></div>
+          </div>
+          <button class="round-btn small" id="betPlus" aria-label="Increase bet">+</button>
+        </div>
+
+        <div class="meter win">
+          <div class="meter-top">WIN</div>
+          <div class="meter-val win-amount">Rs <span id="winVal">0.00</span></div>
+        </div>
+
+        <div class="controls">
+          <button class="round-btn turbo" id="btnTurbo" title="Turbo spin" aria-label="Turbo spin"></button>
+          <button class="round-btn auto"  id="btnAuto"  title="Auto spin"  aria-label="Auto spin"></button>
+          <button class="round-btn spin"  id="btnSpin"  title="Spin" aria-label="Spin">
+            <span class="spin-ring"></span>
+            <span class="spin-text">SPIN</span>
+          </button>
+        </div>
+
+        <div class="util">
+          <button class="icon-btn" id="btnSound" title="Sound on/off" aria-label="Sound">&#128266;</button>
+          <button class="icon-btn" id="btnHistory" title="History" aria-label="History">&#128220;</button>
+        </div>
+      </footer>
+
+      <div class="turbo-hint" id="turboHint">Press turbo spin</div>
+    </div>
+  </div>
+
+  <!-- ===================== RULES MODAL ===================== -->
+  <div class="modal" id="rulesModal" hidden>
+    <div class="modal-card">
+      <button class="modal-close" id="rulesClose" aria-label="Close">&times;</button>
+      <div class="rules-tabs" id="rulesTabs"></div>
+      <div class="rules-body" id="rulesBody"></div>
+    </div>
+  </div>
+
+  <!-- ===================== AUTOSPIN MODAL ===================== -->
+  <div class="modal" id="autoModal" hidden>
+    <div class="modal-card small-card">
+      <button class="modal-close" id="autoClose" aria-label="Close">&times;</button>
+      <h2 class="modal-title">Auto Spin</h2>
+      <p class="modal-sub">Total spins to play automatically</p>
+      <div class="auto-grid" id="autoGrid"></div>
+      <div class="auto-actions">
+        <button class="wide-btn ghost" id="autoCancel">Cancel</button>
+        <button class="wide-btn gold" id="autoStart">Start</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== FEATURE OVERLAY ===================== -->
+  <div class="overlay" id="overlay" hidden>
+    <div class="overlay-inner" id="overlayInner"></div>
+  </div>
+
+  <script src="js/symbols.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/rules.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

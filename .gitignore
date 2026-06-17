@@ -1,0 +1,7 @@
+# debug screenshots / scratch
+_shot_*.png
+_edge_err.txt
+*.log
+
+# node (only used for offline tests, never shipped)
+node_modules/
