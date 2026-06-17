@@ -39,9 +39,8 @@
     $('filter-defs').innerHTML = S.FILTER_DEFS;
 
     // decorative art
-    $('pillarL').innerHTML = S.art.pillar();
-    $('pillarR').innerHTML = S.art.pillar();
-    ['torchTL', 'torchTR', 'torchBL', 'torchBR'].forEach((id) => { $(id).innerHTML = S.art.torch(); });
+    $('pillarL').innerHTML = '<img src="assets/pole.png" alt="" draggable="false" />';
+    $('pillarR').innerHTML = '<img src="assets/pole.png" alt="" draggable="false" />';
     $('character').innerHTML = '<img src="assets/ezgif.gif" alt="Historian" draggable="false" />';
     $('runeRing').innerHTML = S.art.techRune();
 
