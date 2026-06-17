@@ -1,9 +1,19 @@
-# Golden Temple — 46,656 Ways slot
+# Aether Dynasty — 46,656 Ways slot
 
-A from-scratch browser recreation of the **Golden Temple** expanding-ways slot,
-built to the game's own instruction screens. Pure HTML/CSS/JavaScript — **no
-external image assets**. Every symbol, the explorer character, torches, pillars
-and ornate frames are generated as **dynamic SVG** at runtime.
+A from-scratch browser slot built to a classic expanding-ways spec, rebranded
+with a **futuristic-meets-historical** identity ("Neon Antiquity"): an ancient
+temple lit by torches, wrapped in a glowing holographic / stargate aesthetic.
+Pure HTML/CSS/JavaScript — **no external image assets**. Every symbol, the
+explorer character, torches, pillars, ornate frames and the rotating astrolabe
+rune-ring are generated as **dynamic SVG** at runtime.
+
+### Look & type system
+- **Fonts:** `Orbitron` (futuristic readouts — brand, ways counter, HUD numbers,
+  feature titles), `Marcellus SC` (ancient Roman-inscription labels & tabs),
+  `Spectral` (classic serif body copy).
+- **Futuristic layer:** a slow counter-rotating astrolabe **rune-ring** behind
+  the board (ancient glyphs + tech ticks), a neon grid + scanline backdrop,
+  cyan-neon board edge, holographic WAYS panel, and neon-ringed controls.
 
 ## Run it
 

@@ -43,6 +43,7 @@
     $('pillarR').innerHTML = S.art.pillar();
     ['torchTL', 'torchTR', 'torchBL', 'torchBR'].forEach((id) => { $(id).innerHTML = S.art.torch(); });
     $('character').innerHTML = S.art.character();
+    $('runeRing').innerHTML = S.art.techRune();
 
     boardEl = $('board'); cascadeFx = $('cascadeFx');
     balValEl = $('balVal'); betValEl = $('betVal'); winValEl = $('winVal');

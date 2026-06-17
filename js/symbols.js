@@ -333,6 +333,51 @@
       </svg>`;
   }
 
+  // Astrolabe / stargate rune-ring — the "ancient-meets-futuristic" centerpiece
+  // that glows and slowly rotates behind the reel board.
+  function techRune() {
+    const glow = uid('rg');
+    const glyphs = ['𓂀', '𓆣', '𓋹', '𓊽', '𓁹', '𓃭', '𓏏', '𓇯', '◈', '⟁', '✶', '⌖', '◇', '⬡', '✦', '⟐'];
+    let glyphRing = '';
+    for (let i = 0; i < glyphs.length; i++) {
+      const a = (i / glyphs.length) * 360;
+      glyphRing += `<text x="200" y="74" text-anchor="middle" font-size="20" fill="#ffd86a" transform="rotate(${a} 200 200)" opacity=".9" font-family="serif">${glyphs[i]}</text>`;
+    }
+    let ticks = '';
+    for (let i = 0; i < 60; i++) {
+      const a = (i / 60) * 360, long = i % 5 === 0;
+      ticks += `<line x1="200" y1="22" x2="200" y2="${long ? 36 : 28}" stroke="#43e8ff" stroke-width="${long ? 2 : 1}" transform="rotate(${a} 200 200)" opacity=".7"/>`;
+    }
+    let circ = '';
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * 360; circ += `<path d="M200,104 l0,18 m-11,0 l22,0" stroke="#7af9ff" stroke-width="1.4" fill="none" transform="rotate(${a} 200 200)" opacity=".6"/>`; }
+    return `
+      <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" class="rune-svg">
+        <defs>
+          <radialGradient id="${glow}" cx="50%" cy="50%" r="50%">
+            ${stops([[0, '#43e8ff', 0], [0.78, '#43e8ff', 0], [0.93, '#43e8ff', 0.22], [1, '#43e8ff', 0]])}
+          </radialGradient>
+        </defs>
+        <circle cx="200" cy="200" r="198" fill="url(#${glow})"/>
+        <g class="rr-outer" fill="none">
+          <circle cx="200" cy="200" r="190" stroke="#c9962f" stroke-width="2" opacity=".85"/>
+          <circle cx="200" cy="200" r="178" stroke="#43e8ff" stroke-width="1" stroke-dasharray="2 6" opacity=".6"/>
+          ${ticks}
+        </g>
+        <g class="rr-mid" fill="none">
+          <circle cx="200" cy="200" r="158" stroke="#ffd86a" stroke-width="1" opacity=".5"/>
+          <circle cx="200" cy="200" r="146" stroke="#ffd86a" stroke-width="1" opacity=".5"/>
+          ${glyphRing}
+        </g>
+        <g class="rr-inner" fill="none">
+          <circle cx="200" cy="200" r="118" stroke="#43e8ff" stroke-width="1.5" opacity=".55"/>
+          <circle cx="200" cy="200" r="118" stroke="#43e8ff" stroke-width="6" stroke-dasharray="30 30" opacity=".28"/>
+          ${circ}
+          <polygon points="200,118 252,200 200,282 148,200" stroke="#ffd86a" stroke-width="1" opacity=".45"/>
+          <polygon points="200,140 236,200 200,260 164,200" stroke="#7af9ff" stroke-width="1" opacity=".4"/>
+        </g>
+      </svg>`;
+  }
+
   /* ---------------------------------------------------------------------------
      SYMBOL REGISTRY
      id, label, paytable (per single occurrence at bet = 3), rng weight, builder
@@ -383,7 +428,7 @@
     get: (id) => REGISTRY[id],
     buildWild,
     buildFrameOverlay,
-    art: { torch, character, pillar, frameOverlay },
+    art: { torch, character, pillar, frameOverlay, techRune },
     FILTER_DEFS,
   };
 })(window);
