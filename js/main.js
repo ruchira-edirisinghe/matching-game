@@ -42,7 +42,7 @@
     $('pillarL').innerHTML = S.art.pillar();
     $('pillarR').innerHTML = S.art.pillar();
     ['torchTL', 'torchTR', 'torchBL', 'torchBR'].forEach((id) => { $(id).innerHTML = S.art.torch(); });
-    $('character').innerHTML = S.art.character();
+    $('character').innerHTML = '<img src="assets/ezgif.gif" alt="Historian" draggable="false" />';
     $('runeRing').innerHTML = S.art.techRune();
 
     boardEl = $('board'); cascadeFx = $('cascadeFx');

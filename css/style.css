@@ -97,23 +97,21 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 @keyframes flickerIn{from{opacity:.7;transform:translateY(2px) scaleY(.95);}to{opacity:1;transform:translateY(-2px) scaleY(1.05);}}
 @keyframes glow{from{opacity:.25;}to{opacity:.5;}}
 
-/* character */
-.character{position:absolute;right:1%;bottom:8%;width:20%;max-width:230px;z-index:5;
-  filter:drop-shadow(0 6px 14px #000a);pointer-events:none;}
-.character svg{width:100%;height:auto;}
+/* character (historian) */
+.character{position:absolute;right:-2%;bottom:7%;width:44%;max-width:520px;max-height:96%;z-index:7;
+  filter:drop-shadow(0 12px 18px #000b) drop-shadow(0 0 18px #ff8a1e55);pointer-events:none;
+  animation:charFloat 4.5s ease-in-out infinite;}
+.character img{width:100%;height:auto;max-height:100%;object-fit:contain;display:block;}
+@keyframes charFloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
 
 /* ---- top bar -------------------------------------------------------------- */
 .topbar{position:relative;z-index:6;display:flex;align-items:center;justify-content:center;
-  padding:8px 14px;min-height:48px;}
-.logo{font-family:var(--font-fx);font-weight:900;font-size:clamp(18px,3.4vw,32px);
-  letter-spacing:3px;text-align:center;line-height:1;text-transform:uppercase;
-  filter:drop-shadow(0 0 10px #43e8ff77) drop-shadow(0 2px 0 #5a2c06);
+  padding:12px 14px 4px;min-height:56px;}
+.logo{display:flex;align-items:center;justify-content:center;line-height:0;
   animation:logoFlick 6s infinite;}
-@keyframes logoFlick{0%,97%,100%{filter:drop-shadow(0 0 10px #43e8ff77) drop-shadow(0 2px 0 #5a2c06);}98%{filter:drop-shadow(0 0 4px #43e8ff44) drop-shadow(0 2px 0 #5a2c06);}}
-.logo-golden{color:#ffd24a;background:linear-gradient(#fff6c8,#f6b32a 55%,#a4600f);
-  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
-.logo-temple{color:#cfefff; background:linear-gradient(#ffffff,#aef0ff 45%,#43c8e8);
-  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-left:10px;}
+.logo img{height:clamp(82px,18vh,180px);width:auto;display:block;
+  filter:drop-shadow(0 0 18px #43e8ff77) drop-shadow(0 4px 12px #000b);}
+@keyframes logoFlick{0%,95%,100%{opacity:1;}96%{opacity:.78;}97%{opacity:1;}98.5%{opacity:.85;}}
 .info-btn{position:absolute;right:14px;top:50%;transform:translateY(-50%);}
 
 .icon-btn{background:#0007;border:1px solid #ffd86a55;color:#ffe1a0;border-radius:50%;
