@@ -485,7 +485,13 @@
   // =============================================================================
   function wireControls() {
     btnSpin.addEventListener('click', handleSpinPress);
-    document.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); handleSpinPress(); } });
+    document.addEventListener('keydown', (e) => {
+      if (e.code !== 'Space') return;
+      e.preventDefault();
+      // don't spin behind an open modal
+      if (!$('rulesModal').hidden || !$('autoModal').hidden || !$('historyModal').hidden) return;
+      handleSpinPress();
+    });
 
     $('betPlus').addEventListener('click', () => { if (spinning) return; engine.changeBet(1); betValEl.textContent = engine.bet; beep(520, 0.05, 'square', 0.04); });
     $('betMinus').addEventListener('click', () => { if (spinning) return; engine.changeBet(-1); betValEl.textContent = engine.bet; beep(420, 0.05, 'square', 0.04); });

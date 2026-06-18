@@ -95,10 +95,10 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 
 /* ---- top bar -------------------------------------------------------------- */
 .topbar{position:relative;z-index:6;display:flex;align-items:flex-start;justify-content:center;
-  padding:2.4cqh 2cqw 0.4cqh;}
+  padding:1.7cqh 2cqw 0.3cqh;}
 .logo{display:flex;align-items:center;justify-content:center;line-height:0;
   animation:logoFlick 6s infinite;}
-.logo img{height:clamp(72px,17cqh,200px);width:auto;display:block;
+.logo img{height:clamp(62px,14.5cqh,184px);width:auto;display:block;
   filter:drop-shadow(0 0 18px #43e8ff77) drop-shadow(0 4px 12px #000b);}
 @keyframes logoFlick{0%,95%,100%{opacity:1;}96%{opacity:.78;}97%{opacity:1;}98.5%{opacity:.85;}}
 /* "How to play" button — dark pill so the gold content reads clearly */
