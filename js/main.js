@@ -73,7 +73,7 @@
     if (/[?&]free/.test(location.search)) {
       engine.st.inFree = true; engine.st.freeLeft = 6; engine.st.freeTotal = 6; engine.st.mult = 2;
       engine.st.goldenTreasureUsed = false;
-      setTimeout(() => runFreeGames(engine.balance), 250);
+      setTimeout(() => { setSpinning(true); runFreeGames().then(() => setSpinning(false)); }, 250);
     }
   });
 
@@ -249,19 +249,20 @@
       await animateBalanceTo((result.freeMode ? prevBal : prevBal - engine.bet) + runWin);
     }
 
-    setSpinning(false);
-
     // reconcile balance exactly with the engine
     await animateBalanceTo(engine.balance);
 
-    // feature transitions
+    // feature transitions — keep the spin locked while overlays / free games
+    // run so a stray Space or button press can't start a concurrent spin
     if (result.triggeredFree) {
       await featureOverlay('FREE GAME', 'You reached 46,656 WAYS!', '6 Free Games', 1600);
-      await runFreeGames(prevBal - engine.bet + runWin);
+      await runFreeGames();
     } else if (runWin >= engine.bet * 20) {
       sndBig();
       await featureOverlay(runWin >= engine.bet * 60 ? 'MEGA WIN' : 'BIG WIN', '', 'Rs ' + fmtMoney(runWin), 1700, true);
     }
+
+    setSpinning(false);
 
     // autospin continuation
     if (autoRemaining > 0 || autoInfinite) {
@@ -317,7 +318,6 @@
 
   function spawnSparks(winCells) {
     if (turbo === 2) return;
-    const fr = boardEl.getBoundingClientRect();
     const wr = cascadeFx.getBoundingClientRect();
     winCells.slice(0, 24).forEach(([c, r]) => {
       const el = cells[c] && cells[c][r];
@@ -368,7 +368,7 @@
   }
 
   // ---- free games -----------------------------------------------------------
-  async function runFreeGames(balAfterTrigger) {
+  async function runFreeGames() {
     const banner = $('freeBanner');
     banner.hidden = false;
     let freeTotalWin = 0;

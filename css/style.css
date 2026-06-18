@@ -78,14 +78,6 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .rune-ring .rr-inner{transform-box:fill-box;transform-origin:center;animation:rrspin 70s linear infinite reverse;}
 @keyframes rrspin{to{transform:rotate(360deg);}}
 
-/* marble columns */
-.pillar{position:absolute;top:0;bottom:0;width:auto;z-index:1;
-  filter:drop-shadow(0 0 18px #000a);}
-.pillar img{height:100%;width:auto;display:block;}
-.pillar.left{left:0;}
-.pillar.right{right:0;}
-.pillar.right img{transform:scaleX(-1);}
-
 /* torches */
 .torch{position:absolute;width:58px;height:150px;z-index:4;pointer-events:none;
   filter:drop-shadow(0 0 22px #ff8a1eaa);}
@@ -100,13 +92,6 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 @keyframes flicker{from{transform:scaleY(.96) scaleX(1.02) rotate(-1.5deg);}to{transform:scaleY(1.06) scaleX(.97) rotate(1.5deg);}}
 @keyframes flickerIn{from{opacity:.7;transform:translateY(2px) scaleY(.95);}to{opacity:1;transform:translateY(-2px) scaleY(1.05);}}
 @keyframes glow{from{opacity:.25;}to{opacity:.5;}}
-
-/* character (historian) */
-.character{position:absolute;right:-2%;bottom:7%;width:44%;max-width:520px;max-height:96%;z-index:7;
-  filter:drop-shadow(0 12px 18px #000b) drop-shadow(0 0 18px #ff8a1e55);pointer-events:none;
-  animation:charFloat 4.5s ease-in-out infinite;}
-.character img{width:100%;height:auto;max-height:100%;object-fit:contain;display:block;}
-@keyframes charFloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
 
 /* ---- top bar -------------------------------------------------------------- */
 .topbar{position:relative;z-index:6;display:flex;align-items:flex-start;justify-content:center;
@@ -418,8 +403,5 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 @keyframes coinFall{to{transform:translateY(110vh) rotate(540deg);opacity:.4;}}
 
 /* ---- responsive ----------------------------------------------------------- */
-/* The stage is locked to 16:9 and scales via container units, so it stays
-   proportional on its own. On very small phones, free up the side art. */
-@media (max-width:560px){
-  .character{display:none;}
-}
+/* The stage fills the viewport and scales its interior via container units
+   (cqw/cqh), so it stays proportional on its own without media queries. */
