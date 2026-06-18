@@ -21,9 +21,10 @@
   let spinning = false, skip = false;
   let turbo = 0;                 // 0 = off, 1 = turbo, 2 = super turbo
   let soundOn = true;
-  let autoRemaining = 0, autoInfinite = false;
+  let autoRemaining = 0, autoInfinite = false, autoSelected = 10;
   let shownBalance = engine.balance, balanceTarget = engine.balance;
   let winThisSpin = 0;
+  let history = [];   // transaction log, newest first
 
   const speed = () => (skip ? 0.001 : (turbo === 2 ? 0.28 : turbo === 1 ? 0.5 : 1));
   const sleep = (ms) => new Promise((r) => setTimeout(r, Math.max(0, ms * speed())));
@@ -63,7 +64,7 @@
     // headless / debug hooks
     window.GT = { engine, doSpin, render: renderBoard, state: () => ({ b: currentBoard, h: currentHeights }) };
     if (/[?&]autospin/.test(location.search)) {
-      autoInfinite = true; btnAuto.classList.add('on');
+      autoInfinite = true; btnAuto.classList.add('on'); updateAutoBtn(); refreshSpinBtn();
       setTimeout(doSpin, 200);
     }
     if (/[?&]rules/.test(location.search)) {
@@ -197,8 +198,21 @@
   function setSpinning(on) {
     spinning = on;
     btnSpin.classList.toggle('spinning', on);
-    btnSpin.querySelector('.spin-text').textContent = on ? 'STOP' : 'SPIN';
     [$('betMinus'), $('betPlus')].forEach((b) => b.disabled = on);
+    refreshSpinBtn();
+  }
+
+  // the big spin button doubles as the auto-spin countdown + STOP control
+  function refreshSpinBtn() {
+    const autoActive = autoInfinite || autoRemaining > 0;
+    btnSpin.classList.toggle('autoact', autoActive);
+    btnSpin.title = autoActive ? 'Stop auto spin' : 'Spin';
+  }
+
+  // pressing spin (or Space): stop auto-spin if it's running, otherwise spin
+  function handleSpinPress() {
+    if (autoInfinite || autoRemaining > 0) { stopAuto(); skip = true; return; }
+    doSpin();
   }
 
   async function preSpin() {
@@ -251,12 +265,14 @@
 
     // reconcile balance exactly with the engine
     await animateBalanceTo(engine.balance);
+    recordHistory('spin', engine.bet, runWin, engine.balance);
 
     // feature transitions — keep the spin locked while overlays / free games
     // run so a stray Space or button press can't start a concurrent spin
     if (result.triggeredFree) {
       await featureOverlay('FREE GAME', 'You reached 46,656 WAYS!', '6 Free Games', 1600);
-      await runFreeGames();
+      const freeWin = await runFreeGames();
+      recordHistory('free', 0, freeWin, engine.balance);
     } else if (runWin >= engine.bet * 20) {
       sndBig();
       await featureOverlay(runWin >= engine.bet * 60 ? 'MEGA WIN' : 'BIG WIN', '', 'Rs ' + fmtMoney(runWin), 1700, true);
@@ -268,9 +284,10 @@
     if (autoRemaining > 0 || autoInfinite) {
       if (!autoInfinite) autoRemaining--;
       $('btnAuto').classList.toggle('on', autoRemaining > 0 || autoInfinite);
+      updateAutoBtn(); refreshSpinBtn();
       if ((autoRemaining > 0 || autoInfinite) && engine.canSpin()) {
         await sleep(450);
-        doSpin();
+        if (autoRemaining > 0 || autoInfinite) doSpin();   // user may have stopped during the gap
       } else { stopAuto(); }
     }
   }
@@ -408,6 +425,7 @@
     banner.hidden = true;
     await featureOverlay('FREE GAME OVER', 'Total Free Game Win', 'Rs ' + fmtMoney(freeTotalWin), 1900, true);
     setWin(freeTotalWin);
+    return freeTotalWin;
   }
 
   // ---- overlays -------------------------------------------------------------
@@ -444,12 +462,30 @@
     btnSpin.animate([{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(0)' }], { duration: 220, iterations: 2 });
   }
 
+  // ---- transaction history --------------------------------------------------
+  function recordHistory(type, bet, win, balance) {
+    history.unshift({ time: new Date().toLocaleTimeString(), type, bet, win, balance });
+    if (history.length > 500) history.length = 500;
+    if (!$('historyModal').hidden) renderHistory();   // live-update if the modal is open
+  }
+  function renderHistory() {
+    const list = $('historyList');
+    if (!history.length) { list.innerHTML = '<div class="history-empty">No spins yet — press SPIN to play.</div>'; return; }
+    list.innerHTML = history.map((h) => {
+      const win = h.win > 0
+        ? `<span class="history-win">+Rs ${fmtMoney(h.win)}</span>`
+        : `<span class="history-win zero">Rs 0.00</span>`;
+      const bet = (h.type === 'free') ? '<span class="history-tag">FREE</span>' : 'Rs ' + fmtInt(h.bet);
+      return `<div class="history-row"><span class="history-time">${h.time}</span><span>${bet}</span><span>${win}</span><span class="history-bal">Rs ${fmtMoney(h.balance)}</span></div>`;
+    }).join('');
+  }
+
   // =============================================================================
   // Controls
   // =============================================================================
   function wireControls() {
-    btnSpin.addEventListener('click', doSpin);
-    document.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); doSpin(); } });
+    btnSpin.addEventListener('click', handleSpinPress);
+    document.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); handleSpinPress(); } });
 
     $('betPlus').addEventListener('click', () => { if (spinning) return; engine.changeBet(1); betValEl.textContent = engine.bet; beep(520, 0.05, 'square', 0.04); });
     $('betMinus').addEventListener('click', () => { if (spinning) return; engine.changeBet(-1); betValEl.textContent = engine.bet; beep(420, 0.05, 'square', 0.04); });
@@ -467,7 +503,13 @@
     });
 
     $('btnSound').addEventListener('click', () => { soundOn = !soundOn; $('btnSound').classList.toggle('muted', !soundOn); $('btnSound').innerHTML = soundOn ? '&#128266;' : '&#128263;'; });
-    $('btnHistory').addEventListener('click', () => featureOverlay('HISTORY', 'No bets recorded yet', 'Balance Rs ' + fmtMoney(engine.balance), 1400));
+    $('btnHistory').addEventListener('click', () => { renderHistory(); $('historyModal').hidden = false; });
+    $('historyClose').addEventListener('click', () => { $('historyModal').hidden = true; });
+    $('historyModal').addEventListener('click', (e) => { if (e.target === $('historyModal')) $('historyModal').hidden = true; });
+    // Esc closes whichever modal is open
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') ['historyModal', 'rulesModal', 'autoModal'].forEach((id) => { if (!$(id).hidden) $(id).hidden = true; });
+    });
 
     // rules modal
     $('btnRules').addEventListener('click', () => { $('rulesModal').hidden = false; });
@@ -479,12 +521,15 @@
     $('autoCancel').addEventListener('click', () => { $('autoModal').hidden = true; });
     $('autoStart').addEventListener('click', () => {
       $('autoModal').hidden = true;
+      if (autoSelected === 'inf') { autoInfinite = true; autoRemaining = 0; }
+      else { autoInfinite = false; autoRemaining = autoSelected; }
       btnAuto.classList.add('on');
+      updateAutoBtn(); refreshSpinBtn();
       if (!spinning) doSpin();
     });
   }
 
-  function stopAuto() { autoRemaining = 0; autoInfinite = false; btnAuto.classList.remove('on'); }
+  function stopAuto() { autoRemaining = 0; autoInfinite = false; btnAuto.classList.remove('on'); updateAutoBtn(); refreshSpinBtn(); }
 
   // ---- autospin count picker ------------------------------------------------
   function buildAutoGrid() {
@@ -497,12 +542,28 @@
       b.addEventListener('click', () => {
         grid.querySelectorAll('button').forEach((x) => x.classList.remove('sel'));
         b.classList.add('sel');
-        if (o === '∞') { autoInfinite = true; autoRemaining = 0; } else { autoInfinite = false; autoRemaining = o; }
+        autoSelected = (o === '∞') ? 'inf' : o;
+        setAutoDisplay();
       });
       grid.appendChild(b);
     });
     grid.firstChild.classList.add('sel');
-    autoRemaining = 10;
+    autoSelected = 10;
+    setAutoDisplay();
+  }
+
+  // big readout in the auto-spin modal mirrors the chosen count
+  function setAutoDisplay() {
+    const d = $('autoCountDisplay');
+    if (d) d.textContent = (autoSelected === 'inf') ? '∞' : autoSelected;
+  }
+
+  // the AUTO button shows the live remaining count while spinning (click = stop)
+  function updateAutoBtn() {
+    const txt = btnAuto.querySelector('.btn-text');
+    if (!txt) return;
+    txt.textContent = autoInfinite ? '∞' : (autoRemaining > 0 ? autoRemaining : 'AUTO');
+    btnAuto.title = (autoInfinite || autoRemaining > 0) ? 'Stop auto spin' : 'Auto spin';
   }
 
   // =============================================================================

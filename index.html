@@ -33,11 +33,7 @@
           <img src="assets/logo.png" alt="Aether Dynasty" draggable="false" />
         </div>
         <button class="icon-btn info-btn" id="btnRules" title="How to play" aria-label="How to play">
-          <svg class="info-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <circle cx="12" cy="12" r="10.5" fill="none" stroke="currentColor" stroke-width="2"/>
-            <circle cx="12" cy="7.3" r="1.5" fill="currentColor"/>
-            <rect x="10.6" y="10.4" width="2.8" height="7.4" rx="1.4" fill="currentColor"/>
-          </svg>
+          <span class="info-ico"></span>
           <span class="info-txt">How to Play</span>
         </button>
       </header>
@@ -87,8 +83,10 @@
           <button class="round-btn turbo" id="btnTurbo" title="Turbo spin" aria-label="Turbo spin"><span class="btn-text">TURBO</span></button>
           <button class="round-btn auto"  id="btnAuto"  title="Auto spin"  aria-label="Auto spin"><span class="btn-text">AUTO</span></button>
           <button class="round-btn spin"  id="btnSpin"  title="Spin" aria-label="Spin">
-            <span class="spin-ring"></span>
-            <span class="spin-text">SPIN</span>
+            <span class="spin-frame"></span>
+            <span class="spin-center">
+              <span class="spin-stop">STOP</span>
+            </span>
           </button>
         </div>
 
@@ -116,12 +114,28 @@
     <div class="modal-card small-card">
       <button class="modal-close" id="autoClose" aria-label="Close">&times;</button>
       <h2 class="modal-title">Auto Spin</h2>
-      <p class="modal-sub">Total spins to play automatically</p>
+      <p class="modal-sub">Choose how many spins to play automatically</p>
+      <div class="auto-readout">
+        <span class="auto-readout-num" id="autoCountDisplay">10</span>
+        <span class="auto-readout-lbl">spins</span>
+      </div>
       <div class="auto-grid" id="autoGrid"></div>
       <div class="auto-actions">
         <button class="wide-btn ghost" id="autoCancel">Cancel</button>
         <button class="wide-btn gold" id="autoStart">Start</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ===================== HISTORY MODAL ===================== -->
+  <div class="modal" id="historyModal" hidden>
+    <div class="modal-card">
+      <button class="modal-close" id="historyClose" aria-label="Close">&times;</button>
+      <h2 class="modal-title">Transaction History</h2>
+      <div class="history-head">
+        <span>Time</span><span>Bet</span><span>Win</span><span>Balance</span>
+      </div>
+      <div class="history-list" id="historyList"></div>
     </div>
   </div>
 

@@ -10,6 +10,11 @@
       tab: 'Rules',
       title: 'Game Rules',
       html: `
+        <div class="quickstart">
+          <div class="qs"><span class="qs-n">1</span><div><b>Set your bet</b><p>Tap &minus; / + to choose your stake, then press SPIN.</p></div></div>
+          <div class="qs"><span class="qs-n">2</span><div><b>Match symbols</b><p>Land 3+ of the same symbol on adjacent reels, left&nbsp;to&nbsp;right.</p></div></div>
+          <div class="qs"><span class="qs-n">3</span><div><b>Cascade &amp; grow</b><p>Wins clear away, new symbols drop in, and ways grow toward 46,656.</p></div></div>
+        </div>
         <ol class="rules-list">
           <li>It is a <b>6 reel</b> video slot machine. Based on the payway setup, all winning symbols pay from
               <b>left to right</b> on adjacent reels starting from the leftmost reel, landing <b>3 or more</b> symbols to win.</li>
