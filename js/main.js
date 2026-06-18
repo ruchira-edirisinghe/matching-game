@@ -98,7 +98,8 @@
     }
   }
 
-  function renderCell(el, cell, animateDrop, dropDelay) {
+  function renderCell(el, cell, animateDrop, dropDelay, breakFill) {
+    const wasEmpty = el.classList.contains('locked');
     el.className = 'cell';
     el.innerHTML = '';
     if (!cell) { el.classList.add('locked'); return; }
@@ -111,18 +112,26 @@
       f.innerHTML = S.buildFrameOverlay();
       el.appendChild(f.firstElementChild);
     }
-    if (animateDrop && cell.fresh) {
+    // a caramel (block-image) box being replaced: break it first, then let the
+    // symbol pass into the spot. Only genuine empty/caramel boxes break this way.
+    if (breakFill && wasEmpty) {
+      el.classList.add('break-fill');
+      const brk = document.createElement('div');
+      brk.className = 'break-fx';
+      brk.addEventListener('animationend', () => brk.remove());
+      el.appendChild(brk);
+    } else if (animateDrop && cell.fresh) {
       el.classList.add('drop');
       sym.style.animationDelay = (dropDelay || 0) + 's';
     }
   }
 
-  function renderBoard(animateDrop) {
+  function renderBoard(animateDrop, breakFill) {
     for (let c = 0; c < COLS; c++) {
       const h = currentHeights[c];
       for (let r = 0; r < ROWS; r++) {
         const cell = r < h ? currentBoard[c][r] : null;
-        renderCell(cells[c][r], cell, animateDrop, r * 0.035 + c * 0.02);
+        renderCell(cells[c][r], cell, animateDrop, r * 0.035 + c * 0.02, breakFill);
       }
     }
   }
@@ -277,6 +286,7 @@
     // 2) eliminate / transform / decrement
     casc.removed.forEach(([c, r]) => cells[c][r].classList.add('clear'));
     casc.blast.forEach(([c, r]) => cells[c][r].classList.add('clear'));
+    spawnMagic(casc.removed.concat(casc.blast));
     casc.transformed.forEach(({ c, r, n }) => {
       const el = cells[c][r];
       el.classList.remove('win'); el.classList.add('transform');
@@ -290,19 +300,19 @@
       cells[c][r].classList.add('transform');
     });
     sndDrop();
-    await sleep(340);
+    await sleep(440);   // matched symbols pop / sparkle out
 
-    // 3) drop the resulting board + expansion glow
+    // 3) drop the resulting board — caramel boxes being replaced break first, then symbols pass in
     currentBoard = casc.resultBoard;
     currentHeights = casc.resultHeights;
-    renderBoard(true);
+    renderBoard(true, true);
     casc.expandCols.forEach((c) => {
       const r = casc.resultHeights[c] - 1;
       if (cells[c][r]) cells[c][r].classList.add('unlock');
     });
     if (casc.expandCols.length) beep(660, 0.12, 'triangle', 0.05);
     await animateWaysTo(casc.waysAfter);
-    await sleep(260);
+    await sleep(360);
   }
 
   function spawnSparks(winCells) {
@@ -321,6 +331,39 @@
       s.style.setProperty('--dy', ((Math.random() - 0.5) * 60) + 'px');
       cascadeFx.appendChild(s);
       setTimeout(() => s.remove(), 700);
+    });
+  }
+
+  // magical sparkle burst when matched boxes pop away (stars + glitter)
+  const MAGIC_COLS = [['#ffffff', '#ffd24a'], ['#bfefff', '#43e8ff'], ['#e9c6ff', '#a64bff'], ['#fff6c8', '#ffae3a']];
+  function spawnMagic(popCells) {
+    if (turbo === 2) return;
+    const perCell = turbo === 1 ? 5 : 8;
+    const wr = cascadeFx.getBoundingClientRect();
+    popCells.slice(0, 18).forEach(([c, r]) => {
+      const el = cells[c] && cells[c][r];
+      if (!el) return;
+      const b = el.getBoundingClientRect();
+      const cx = b.left - wr.left + b.width / 2;
+      const cy = b.top - wr.top + b.height / 2;
+      for (let i = 0; i < perCell; i++) {
+        const star = i % 2 === 0;
+        const p = document.createElement('div');
+        p.className = star ? 'mstar' : 'mglow';
+        const ang = Math.random() * Math.PI * 2;
+        const dist = 20 + Math.random() * 36;
+        const col = MAGIC_COLS[(Math.random() * MAGIC_COLS.length) | 0];
+        p.style.left = cx + 'px';
+        p.style.top = cy + 'px';
+        p.style.setProperty('--dx', (Math.cos(ang) * dist).toFixed(1) + 'px');
+        p.style.setProperty('--dy', (Math.sin(ang) * dist).toFixed(1) + 'px');
+        p.style.setProperty('--col', col[0]);
+        p.style.setProperty('--col2', col[1]);
+        p.style.setProperty('--sz', (star ? 9 + Math.random() * 10 : 4 + Math.random() * 5).toFixed(0) + 'px');
+        p.style.setProperty('--dur', (0.55 + Math.random() * 0.35).toFixed(2) + 's');
+        cascadeFx.appendChild(p);
+        setTimeout(() => p.remove(), 1000);
+      }
     });
   }
 

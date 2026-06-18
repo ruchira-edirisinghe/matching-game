@@ -130,8 +130,8 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .icon-btn.info-btn:hover{
   background:radial-gradient(120% 150% at 38% 18%, #241b0d 0%, #100a05 50%, #050302 100%);
   border-color:#ffe7a0;}
-.info-ico{font-size:1.55em;line-height:1;color:#ffd86a;
-  text-shadow:0 0 8px #ffd86aaa, 0 0 14px #43e8ff66;}
+.info-ico{width:1.5em;height:1.5em;flex:none;display:block;color:#ffd86a;
+  filter:drop-shadow(0 0 5px #ffd86a99) drop-shadow(0 0 9px #43e8ff55);}
 .info-txt{white-space:nowrap;line-height:1;text-shadow:0 0 8px #43e8ff55, 0 1px 2px #000;}
 @keyframes infoPulse{0%,100%{box-shadow:0 0 14px #43e8ff99,0 0 0 3px #00000099,0 4px 14px #000a,inset 0 0 16px #00000099;}
   50%{box-shadow:0 0 28px #43e8ff,0 0 0 3px #00000099,0 4px 14px #000a,inset 0 0 16px #00000099;}}
@@ -177,15 +177,15 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 
 .cell{
   position:relative;flex:1;border-radius:8px;overflow:hidden;
-  background:linear-gradient(#6a5942,#3b2e1f);
+  background:url("../assets/box-bg.png") center/cover no-repeat, #3b2e1f;
   box-shadow:inset 0 1px 0 #ffe9b033, inset 0 -3px 6px #00000066, 0 1px 2px #0008;
   display:grid;place-items:center;
 }
-.cell .sym{width:90%;height:90%;display:grid;place-items:center;}
+.cell .sym{width:90%;height:90%;display:grid;place-items:center;position:relative;z-index:1;}
 .cell .sym svg{width:100%;height:100%;display:block;}
-.cell.locked{background:repeating-linear-gradient(45deg,#1b130c,#1b130c 6px,#241910 6px,#241910 12px);
-  box-shadow:inset 0 0 16px #000c;}
-.cell.locked::after{content:"";position:absolute;inset:30%;border:2px dashed #ffd86a22;border-radius:6px;}
+/* empty boxes are covered by a caramel block */
+.cell.locked{background:url("../assets/block-normal.png") center/cover no-repeat, #241910;
+  box-shadow:inset 0 0 14px #0009, inset 0 1px 0 #ffe9b022;}
 
 /* frame overlay sits above the wrapped symbol */
 .frame-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:2;
@@ -197,8 +197,51 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .cell.win::before{content:"";position:absolute;inset:0;border-radius:8px;
   box-shadow:0 0 0 2px #ffe27a, 0 0 18px #ffd24a, inset 0 0 16px #ffe27a99;}
 @keyframes winPulse{from{transform:scale(1);}to{transform:scale(1.06);}}
-.cell.clear{animation:clearOut .32s ease forwards;}
-@keyframes clearOut{to{transform:scale(.2) rotate(40deg);opacity:0;filter:brightness(2);}}
+/* a matched normal box: the symbol pops with a magical sparkle burst (no box-breaking) */
+.cell.clear{animation:none;}
+.cell.clear .sym{animation:symPop .44s cubic-bezier(.3,1.5,.5,1) forwards;}
+@keyframes symPop{
+  0%{transform:scale(1) rotate(0);opacity:1;filter:brightness(1);}
+  28%{transform:scale(1.3) rotate(-6deg);opacity:1;
+      filter:brightness(1.9) drop-shadow(0 0 12px #fff3b0) drop-shadow(0 0 18px #7af9ff);}
+  100%{transform:scale(.04) rotate(16deg);opacity:0;filter:brightness(2.4);}}
+/* bright flash */
+.cell.clear::after{content:"";position:absolute;inset:-16%;z-index:5;pointer-events:none;
+  background:radial-gradient(circle,#ffffff 0%,#fff4c8 18%,#ffe9a077 40%,#ffd24a00 66%);
+  animation:popFlash .5s ease-out forwards;}
+@keyframes popFlash{0%{opacity:0;transform:scale(.3);}22%{opacity:1;transform:scale(1);}100%{opacity:0;transform:scale(1.7);}}
+/* expanding magic ring */
+.cell.clear::before{content:"";position:absolute;inset:14%;z-index:6;border-radius:50%;pointer-events:none;
+  border:2px solid #ffffffcc;box-shadow:0 0 12px #ffe9a0, 0 0 18px #7af9ff88, inset 0 0 8px #fff8;
+  animation:popRing .5s ease-out forwards;}
+@keyframes popRing{0%{opacity:0;transform:scale(.2);}28%{opacity:.95;}100%{opacity:0;transform:scale(1.65);}}
+
+/* magic burst particles (spawned into the cascade-fx layer on pop) */
+.mstar{position:absolute;width:var(--sz,14px);height:var(--sz,14px);background:var(--col,#fff);
+  clip-path:polygon(50% 0%,58% 42%,100% 50%,58% 58%,50% 100%,42% 58%,0% 50%,42% 42%);
+  filter:drop-shadow(0 0 5px var(--col,#fff)) drop-shadow(0 0 9px var(--col2,#ffd24a));
+  animation:mstar var(--dur,.7s) ease-out forwards;}
+@keyframes mstar{
+  0%{transform:translate(-50%,-50%) scale(0) rotate(0);opacity:0;}
+  22%{transform:translate(calc(-50% + var(--dx)*.32),calc(-50% + var(--dy)*.32)) scale(1.15) rotate(70deg);opacity:1;}
+  100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(.15) rotate(230deg);opacity:0;}}
+.mglow{position:absolute;width:var(--sz,6px);height:var(--sz,6px);border-radius:50%;
+  background:radial-gradient(circle,#fff 0%,var(--col,#ffe9a0) 45%,transparent 72%);
+  filter:drop-shadow(0 0 5px var(--col2,#ffd24a));
+  animation:mglow var(--dur,.65s) ease-out forwards;}
+@keyframes mglow{
+  0%{transform:translate(-50%,-50%) scale(.4);opacity:1;}
+  100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(.1);opacity:0;}}
+
+/* a caramel (block-image) box being replaced: it breaks first (block-gif), THEN
+   the symbol drops into the now-broken spot */
+.break-fx{position:absolute;inset:0;z-index:3;border-radius:8px;pointer-events:none;
+  background:url("../assets/block-gif.gif") center/cover no-repeat;
+  animation:blockBreak .62s ease forwards;}
+@keyframes blockBreak{0%{opacity:1;transform:scale(1);}
+  48%{opacity:1;transform:scale(1.04);}
+  100%{opacity:0;transform:scale(1.18);filter:brightness(1.2) contrast(1.08);}}
+.cell.break-fill .sym{animation:dropIn .34s cubic-bezier(.25,1.2,.4,1) .28s both;}
 .cell.drop .sym{animation:dropIn .34s cubic-bezier(.25,1.2,.4,1) both;}
 @keyframes dropIn{from{transform:translateY(-130%);opacity:0;}to{transform:translateY(0);opacity:1;}}
 .cell.unlock{animation:unlockFx .5s ease;}
@@ -273,9 +316,13 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   border-radius:14px;padding:0 0.7cqw;font-size:clamp(15px,1.7cqw,22px);}
 .round-btn .btn-text{font-family:var(--font-head);font-size:clamp(7px,0.95cqw,11px);
   font-weight:700;letter-spacing:1px;line-height:1;color:#ffe1a0;}
-.round-btn.turbo::before{content:"\26A1";color:#ffd24a;line-height:1;}
+.round-btn.turbo::before{content:"";
+  width:clamp(22px,2.9cqw,38px);height:clamp(20px,2.6cqw,34px);
+  background:url("../assets/turbo.png") center/contain no-repeat;
+  filter:saturate(.7) brightness(.92);opacity:.82;transition:filter .2s,opacity .2s;}
 .round-btn.turbo.on{box-shadow:0 0 16px #ffd24a;border-color:#fff;background:radial-gradient(circle at 35% 30%,#7a5a20,#3a2600);}
-.round-btn.turbo.super::before{content:"\26A1\26A1";font-size:.72em;}
+.round-btn.turbo.on::before{opacity:1;filter:drop-shadow(0 0 6px #ffd24a) drop-shadow(0 0 3px #43e8ff88);}
+.round-btn.turbo.super::before{background-image:url("../assets/super turbo.png");width:clamp(26px,3.4cqw,44px);}
 .round-btn.auto::before{content:"\27F3";color:#9be2ff;line-height:1;font-size:1.2em;}
 .round-btn.auto.on{box-shadow:0 0 16px #9be2ff;border-color:#fff;}
 

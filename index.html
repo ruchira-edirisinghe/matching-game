@@ -4,9 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Aether Dynasty — 46,656 Ways</title>
+  <link rel="icon" href="assets/favicon/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon/favicon-16x16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/favicon/apple-touch-icon.png" />
+  <link rel="manifest" href="assets/favicon/site.webmanifest" />
+  <meta name="theme-color" content="#0a0510" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Marcellus+SC&family=Spectral:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="preload" as="image" href="assets/block-gif.gif" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -31,7 +38,11 @@
           <img src="assets/logo.png" alt="Aether Dynasty" draggable="false" />
         </div>
         <button class="icon-btn info-btn" id="btnRules" title="How to play" aria-label="How to play">
-          <span class="info-ico">&#9432;</span>
+          <svg class="info-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="10.5" fill="none" stroke="currentColor" stroke-width="2"/>
+            <circle cx="12" cy="7.3" r="1.5" fill="currentColor"/>
+            <rect x="10.6" y="10.4" width="2.8" height="7.4" rx="1.4" fill="currentColor"/>
+          </svg>
           <span class="info-txt">How to Play</span>
         </button>
       </header>
