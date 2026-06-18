@@ -41,8 +41,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   container-name:stage;
   display:flex;flex-direction:column;
   background:
-    radial-gradient(135% 105% at 50% 40%, rgba(12,6,18,0.30) 0%, rgba(10,5,15,0.52) 52%, rgba(5,2,8,0.88) 100%),
-    url('../assets/bacckground.png') center/cover no-repeat #0a0510;
+    url('../assets/Winged_figures_near_energy_vortex_202606181051.gif') center/cover no-repeat #0a0510;
   overflow:hidden;
 }
 .screen::before{ /* stone floor — fades smoothly upward, no hard cutoff */
@@ -117,17 +116,25 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .logo img{height:clamp(86px,21cqh,230px);width:auto;display:block;
   filter:drop-shadow(0 0 18px #43e8ff77) drop-shadow(0 4px 12px #000b);}
 @keyframes logoFlick{0%,95%,100%{opacity:1;}96%{opacity:.78;}97%{opacity:1;}98.5%{opacity:.85;}}
-.info-btn{position:absolute;right:1.8cqw;top:50%;transform:translateY(-50%);
-  width:clamp(34px,3.9cqw,54px);height:clamp(34px,3.9cqw,54px);
-  font-size:clamp(19px,2.3cqw,30px);font-weight:700;color:#fff6d8;
-  background:radial-gradient(circle at 38% 30%, #3a2814, #0c0805);
+/* "How to play" button — dark pill so the gold content reads clearly */
+.icon-btn.info-btn{position:absolute;right:1.8cqw;top:50%;transform:translateY(-50%);
+  display:flex;align-items:center;gap:.55em;
+  width:auto;height:auto;border-radius:999px;
+  padding:clamp(7px,1.15cqh,13px) clamp(13px,1.5cqw,22px);
+  font-family:var(--font-fx);text-transform:uppercase;
+  font-size:clamp(11px,1.45cqw,17px);font-weight:800;letter-spacing:1.6px;color:#ffe9b8;
+  background:radial-gradient(120% 150% at 38% 18%, #16110a 0%, #0a0704 48%, #020101 100%);
   border:2px solid #ffd86a;
-  box-shadow:0 0 14px #43e8ffcc, 0 0 0 3px #00000088, inset 0 0 10px #ffd86a55;
+  box-shadow:0 0 18px #43e8ffcc, 0 0 0 3px #00000099, 0 4px 14px #000a, inset 0 0 16px #00000099;
   animation:infoPulse 2.4s ease-in-out infinite;}
-.info-btn:hover{background:radial-gradient(circle at 38% 30%, #5a3e1c, #150d06);
-  box-shadow:0 0 20px #43e8ff, 0 0 0 3px #00000088, inset 0 0 12px #ffd86a88;}
-@keyframes infoPulse{0%,100%{box-shadow:0 0 12px #43e8ff99,0 0 0 3px #00000088,inset 0 0 10px #ffd86a55;}
-  50%{box-shadow:0 0 22px #43e8ff,0 0 0 3px #00000088,inset 0 0 12px #ffd86a88;}}
+.icon-btn.info-btn:hover{
+  background:radial-gradient(120% 150% at 38% 18%, #241b0d 0%, #100a05 50%, #050302 100%);
+  border-color:#ffe7a0;}
+.info-ico{font-size:1.55em;line-height:1;color:#ffd86a;
+  text-shadow:0 0 8px #ffd86aaa, 0 0 14px #43e8ff66;}
+.info-txt{white-space:nowrap;line-height:1;text-shadow:0 0 8px #43e8ff55, 0 1px 2px #000;}
+@keyframes infoPulse{0%,100%{box-shadow:0 0 14px #43e8ff99,0 0 0 3px #00000099,0 4px 14px #000a,inset 0 0 16px #00000099;}
+  50%{box-shadow:0 0 28px #43e8ff,0 0 0 3px #00000099,0 4px 14px #000a,inset 0 0 16px #00000099;}}
 
 .icon-btn{background:#0007;border:1px solid #ffd86a55;color:#ffe1a0;border-radius:50%;
   width:clamp(30px,3.4cqw,46px);height:clamp(30px,3.4cqw,46px);font-size:clamp(14px,1.8cqw,21px);

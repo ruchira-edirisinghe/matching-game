@@ -39,9 +39,6 @@
     $('filter-defs').innerHTML = S.FILTER_DEFS;
 
     // decorative art
-    $('pillarL').innerHTML = '<img src="assets/pole.png" alt="" draggable="false" />';
-    $('pillarR').innerHTML = '<img src="assets/pole.png" alt="" draggable="false" />';
-    $('character').innerHTML = '<img src="assets/ezgif.gif" alt="Historian" draggable="false" />';
     $('runeRing').innerHTML = S.art.techRune();
 
     boardEl = $('board'); cascadeFx = $('cascadeFx');
@@ -486,7 +483,7 @@
       if (wr) { [1, 2, 3].forEach((n) => wr.appendChild(demoCell(S.buildWild(n)))); }
       const fr = bodyEl.querySelector('#frameSymRow');
       if (fr) {
-        const d = demoCell(S.get('PURPLE').svgHTML);
+        const d = demoCell(S.get('ZEUS').svgHTML);
         d.appendChild(frameWrap());
         fr.appendChild(d);
       }

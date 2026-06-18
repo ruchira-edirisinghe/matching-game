@@ -1,7 +1,9 @@
 /* =============================================================================
-   Golden Temple — Dynamic SVG art library
-   Every symbol and decorative element is generated as SVG markup at runtime.
-   No external image assets are used anywhere in the game.
+   Golden Temple — symbol art library
+   The board symbols use the painted PNG assets in assets/match-assets/
+   (Greek gods + card suits + wild chalice), wrapped in a 0 0 100 100 SVG so
+   they reuse the same sizing / glow pipeline as the generated decorative art.
+   Decorative elements (torches, rune-ring, etc.) are still generated as SVG.
    ============================================================================= */
 (function (global) {
   'use strict';
@@ -21,188 +23,32 @@
   }
 
   /* ---------------------------------------------------------------------------
-     GEMS
-     Two cuts are used to echo the reference paytable:
-       brilliantGem  -> pointed round/teardrop cut (RED top symbol, GOLD)
-       tableGem      -> rectangular emerald cut      (PURPLE, GREEN, BLUE)
+     IMAGE SYMBOLS
+     Each board symbol is a painted PNG (assets/match-assets/) placed inside the
+     standard 100x100 viewBox so existing CSS (.cell .sym svg, .pt-icon svg, …)
+     scales it exactly like the old vector symbols. preserveAspectRatio="meet"
+     keeps the artwork undistorted regardless of the cell's aspect ratio.
      --------------------------------------------------------------------------- */
-
-  function brilliantGem(c) {
-    const gT = uid('gt'), gC = uid('gc'), gP = uid('gp'), gl = uid('gl');
-    return svg(`
-      <defs>
-        <radialGradient id="${gT}" cx="42%" cy="34%" r="75%">
-          ${stops([[0, c.hi], [0.45, c.main], [1, c.dark]])}
-        </radialGradient>
-        <linearGradient id="${gC}" x1="0" y1="0" x2="0" y2="1">
-          ${stops([[0, c.hi], [1, c.main]])}
-        </linearGradient>
-        <linearGradient id="${gP}" x1="0" y1="0" x2="0" y2="1">
-          ${stops([[0, c.main], [1, c.dark]])}
-        </linearGradient>
-        <radialGradient id="${gl}" cx="50%" cy="50%" r="50%">
-          ${stops([[0, '#ffffff', 0.95], [1, '#ffffff', 0]])}
-        </radialGradient>
-      </defs>
-      <g filter="url(#softGlow)">
-        <!-- girdle outline -->
-        <polygon points="30,28 70,28 84,46 50,88 16,46" fill="${c.dark}"/>
-        <!-- crown facets -->
-        <polygon points="30,28 70,28 62,46 38,46" fill="url(#${gC})"/>
-        <polygon points="30,28 16,46 38,46" fill="${c.main}"/>
-        <polygon points="70,28 84,46 62,46" fill="${c.hi}"/>
-        <!-- pavilion facets -->
-        <polygon points="38,46 50,46 50,88" fill="url(#${gP})"/>
-        <polygon points="50,46 62,46 50,88" fill="${c.dark}"/>
-        <polygon points="16,46 38,46 50,88" fill="${c.main}"/>
-        <polygon points="62,46 84,46 50,88" fill="${c.hi}"/>
-        <!-- table sparkle -->
-        <polygon points="40,32 60,32 56,42 44,42" fill="url(#${gT})"/>
-        <ellipse cx="44" cy="36" rx="9" ry="4" fill="url(#${gl})" opacity=".85"/>
-        <circle cx="68" cy="40" r="2.4" fill="#fff" opacity=".9"/>
-      </g>`);
-  }
-
-  function tableGem(c) {
-    const gMain = uid('tm'), gBev = uid('tb'), gl = uid('tl');
-    return svg(`
-      <defs>
-        <linearGradient id="${gMain}" x1="0" y1="0" x2="0.4" y2="1">
-          ${stops([[0, c.hi], [0.5, c.main], [1, c.dark]])}
-        </linearGradient>
-        <linearGradient id="${gBev}" x1="0" y1="0" x2="0" y2="1">
-          ${stops([[0, c.hi], [1, c.dark]])}
-        </linearGradient>
-        <radialGradient id="${gl}" cx="50%" cy="40%" r="60%">
-          ${stops([[0, '#ffffff', 0.9], [1, '#ffffff', 0]])}
-        </radialGradient>
-      </defs>
-      <g filter="url(#softGlow)">
-        <rect x="18" y="26" width="64" height="48" rx="7" fill="${c.dark}"/>
-        <!-- bevel frame -->
-        <polygon points="18,26 82,26 72,36 28,36" fill="url(#${gBev})"/>
-        <polygon points="82,26 82,74 72,64 72,36" fill="${c.main}"/>
-        <polygon points="18,26 18,74 28,64 28,36" fill="${c.hi}"/>
-        <polygon points="18,74 82,74 72,64 28,64" fill="${c.dark}"/>
-        <!-- table -->
-        <rect x="28" y="36" width="44" height="28" rx="3" fill="url(#${gMain})"/>
-        <!-- step facets -->
-        <rect x="33" y="40" width="34" height="20" rx="2" fill="none" stroke="${c.hi}" stroke-opacity=".5" stroke-width="1.2"/>
-        <ellipse cx="44" cy="44" rx="11" ry="5" fill="url(#${gl})"/>
-        <circle cx="64" cy="58" r="2" fill="#fff" opacity=".85"/>
-      </g>`);
-  }
-
-  // Blue "cluster" gem (paytable blue shows little stones) — distinct look.
-  function clusterGem(c) {
-    const g = uid('cg'), gl = uid('cl');
-    const stone = (x, y, r) => `
-      <circle cx="${x}" cy="${y}" r="${r}" fill="url(#${g})" stroke="${c.dark}" stroke-width="1"/>
-      <circle cx="${x - r * 0.3}" cy="${y - r * 0.3}" r="${r * 0.4}" fill="#ffffff" opacity=".6"/>`;
-    return svg(`
-      <defs>
-        <radialGradient id="${g}" cx="38%" cy="34%" r="75%">
-          ${stops([[0, c.hi], [0.5, c.main], [1, c.dark]])}
-        </radialGradient>
-        <radialGradient id="${gl}" cx="50%" cy="50%" r="50%">
-          ${stops([[0, '#fff', .8], [1, '#fff', 0]])}
-        </radialGradient>
-      </defs>
-      <g filter="url(#softGlow)">
-        ${stone(36, 40, 14)}
-        ${stone(64, 38, 12)}
-        ${stone(50, 62, 15)}
-        ${stone(70, 64, 9)}
-      </g>`);
+  const ASSET_DIR = 'assets/match-assets/';
+  function imgSym(file) {
+    const href = encodeURI(ASSET_DIR + file);
+    return svg(`<image href="${href}" x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid meet"/>`);
   }
 
   /* ---------------------------------------------------------------------------
-     SCROLL (parchment)
-     --------------------------------------------------------------------------- */
-  function scroll() {
-    const g = uid('sc'), gr = uid('sr');
-    return svg(`
-      <defs>
-        <linearGradient id="${g}" x1="0" y1="0" x2="0" y2="1">
-          ${stops([[0, '#f7e9c4'], [0.5, '#e8cf95'], [1, '#caa96b']])}
-        </linearGradient>
-        <linearGradient id="${gr}" x1="0" y1="0" x2="0" y2="1">
-          ${stops([[0, '#caa15a'], [1, '#8a6326']])}
-        </linearGradient>
-      </defs>
-      <g filter="url(#softGlow)">
-        <rect x="26" y="30" width="48" height="40" rx="3" fill="url(#${g})" stroke="#8a6326" stroke-width="1.4"/>
-        <line x1="34" y1="40" x2="66" y2="40" stroke="#9c7636" stroke-width="2" stroke-linecap="round"/>
-        <line x1="34" y1="48" x2="66" y2="48" stroke="#9c7636" stroke-width="2" stroke-linecap="round"/>
-        <line x1="34" y1="56" x2="58" y2="56" stroke="#9c7636" stroke-width="2" stroke-linecap="round"/>
-        <!-- rolled top & bottom -->
-        <rect x="20" y="24" width="60" height="12" rx="6" fill="url(#${gr})" stroke="#5e3f12" stroke-width="1.4"/>
-        <rect x="20" y="64" width="60" height="12" rx="6" fill="url(#${gr})" stroke="#5e3f12" stroke-width="1.4"/>
-        <circle cx="24" cy="30" r="3.2" fill="#3f2a0c"/>
-        <circle cx="24" cy="70" r="3.2" fill="#3f2a0c"/>
-      </g>`);
-  }
-
-  /* ---------------------------------------------------------------------------
-     LETTER tiles (A / K / Q) — stone carved, gem-tinted
-     --------------------------------------------------------------------------- */
-  function letter(ch, c) {
-    const gFill = uid('lf'), gGold = uid('lg');
-    return svg(`
-      <defs>
-        <linearGradient id="${gGold}" x1="0" y1="0" x2="0" y2="1">
-          ${stops([[0, '#fff2b0'], [0.5, '#f4c64a'], [1, '#a9741b']])}
-        </linearGradient>
-        <radialGradient id="${gFill}" cx="50%" cy="38%" r="70%">
-          ${stops([[0, c.hi], [0.6, c.main], [1, c.dark]])}
-        </radialGradient>
-      </defs>
-      <g filter="url(#softGlow)">
-        <text x="50" y="50" text-anchor="middle" dominant-baseline="central"
-          font-family="Georgia,'Times New Roman',serif" font-weight="700" font-size="62"
-          stroke="#5a3c10" stroke-width="6" paint-order="stroke">${ch}</text>
-        <text x="50" y="50" text-anchor="middle" dominant-baseline="central"
-          font-family="Georgia,'Times New Roman',serif" font-weight="700" font-size="62"
-          stroke="url(#${gGold})" stroke-width="3.2" fill="url(#${gFill})" paint-order="stroke">${ch}</text>
-      </g>`);
-  }
-
-  /* ---------------------------------------------------------------------------
-     WILD — radiant gold medallion. `n` shows the elimination counter badge.
+     WILD — painted golden chalice. `n` shows the elimination counter badge.
      --------------------------------------------------------------------------- */
   function wild(n) {
-    const gMed = uid('wm'), gRay = uid('wr');
-    const rays = [];
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2;
-      const x1 = 50 + Math.cos(a) * 30, y1 = 50 + Math.sin(a) * 30;
-      const x2 = 50 + Math.cos(a) * 46, y2 = 50 + Math.sin(a) * 46;
-      rays.push(`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="url(#${gRay})" stroke-width="3.4" stroke-linecap="round"/>`);
-    }
+    const href = encodeURI(ASSET_DIR + 'wildcard.png');
     const badge = (n && n >= 2) ? `
-      <g>
-        <circle cx="76" cy="76" r="15" fill="#7a1414" stroke="#ffd86a" stroke-width="2.5"/>
-        <text x="76" y="77" text-anchor="middle" dominant-baseline="central"
-          font-family="Georgia,serif" font-weight="700" font-size="18" fill="#ffe9a8">${n}</text>
+      <g filter="url(#softGlow)">
+        <circle cx="77" cy="77" r="16" fill="#7a1414" stroke="#ffd86a" stroke-width="3"/>
+        <text x="77" y="78" text-anchor="middle" dominant-baseline="central"
+          font-family="Georgia,serif" font-weight="700" font-size="20" fill="#ffe9a8">${n}</text>
       </g>` : '';
     return svg(`
-      <defs>
-        <radialGradient id="${gMed}" cx="50%" cy="40%" r="62%">
-          ${stops([[0, '#fff6cf'], [0.45, '#f6c64b'], [1, '#9c6a16']])}
-        </radialGradient>
-        <linearGradient id="${gRay}" x1="0" y1="0" x2="1" y2="1">
-          ${stops([[0, '#ffe48a'], [1, '#c8881f']])}
-        </linearGradient>
-      </defs>
-      <g filter="url(#softGlow)">
-        ${rays.join('')}
-        <circle cx="50" cy="50" r="31" fill="url(#${gMed})" stroke="#7a4d12" stroke-width="2"/>
-        <circle cx="50" cy="50" r="25" fill="none" stroke="#fff3c2" stroke-width="1.4" opacity=".7"/>
-        <text x="50" y="51" text-anchor="middle" dominant-baseline="central"
-          font-family="Georgia,serif" font-weight="800" font-size="17" letter-spacing="0.5"
-          fill="#5a3208">WILD</text>
-        ${badge}
-      </g>`);
+      <image href="${href}" x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid meet"/>
+      ${badge}`);
   }
 
   /* ---------------------------------------------------------------------------
@@ -380,26 +226,18 @@
 
   /* ---------------------------------------------------------------------------
      SYMBOL REGISTRY
-     id, label, paytable (per single occurrence at bet = 3), rng weight, builder
+     id, label, paytable (per single occurrence at bet = 3), rng weight, builder.
+     Three Greek gods are the premium (high) symbols; the four card suits are
+     the lower-paying symbols. Pays descend from Zeus down to the Club.
      --------------------------------------------------------------------------- */
-  const palette = {
-    red:    { hi: '#ff8a6a', main: '#e21f24', dark: '#7c0d10' },
-    purple: { hi: '#d9a8ff', main: '#8b3ff0', dark: '#3d1670' },
-    gold:   { hi: '#ffe79a', main: '#f4a623', dark: '#9c5d0d' },
-    green:  { hi: '#aef0a0', main: '#36b53a', dark: '#155d1a' },
-    blue:   { hi: '#a9d8ff', main: '#2f7fe0', dark: '#123e7a' },
-  };
-
   const DEFS = [
-    { id: 'RED',    kind: 'high', pay: { 3: 0.9, 4: 1.5, 5: 2.0, 6: 3.0 },  weight: 4,  build: () => brilliantGem(palette.red) },
-    { id: 'PURPLE', kind: 'high', pay: { 3: 0.6, 4: 0.75, 5: 1.2, 6: 1.8 }, weight: 6,  build: () => tableGem(palette.purple) },
-    { id: 'GOLD',   kind: 'high', pay: { 3: 0.45, 4: 0.75, 5: 1.05, 6: 1.5 }, weight: 7, build: () => brilliantGem(palette.gold) },
-    { id: 'GREEN',  kind: 'high', pay: { 3: 0.3, 4: 0.6, 5: 0.9, 6: 1.2 },  weight: 9,  build: () => tableGem(palette.green) },
-    { id: 'BLUE',   kind: 'high', pay: { 3: 0.3, 4: 0.45, 5: 0.6, 6: 0.9 }, weight: 10, build: () => clusterGem(palette.blue) },
-    { id: 'SCROLL', kind: 'low',  pay: { 3: 0.3, 4: 0.45, 5: 0.6, 6: 0.75 }, weight: 12, build: () => scroll() },
-    { id: 'A',      kind: 'low',  pay: { 3: 0.15, 4: 0.3, 5: 0.45, 6: 0.6 }, weight: 15, build: () => letter('A', palette.red) },
-    { id: 'K',      kind: 'low',  pay: { 3: 0.15, 4: 0.3, 5: 0.45, 6: 0.6 }, weight: 15, build: () => letter('K', palette.blue) },
-    { id: 'Q',      kind: 'low',  pay: { 3: 0.15, 4: 0.3, 5: 0.45, 6: 0.6 }, weight: 16, build: () => letter('Q', palette.green) },
+    { id: 'ZEUS',      kind: 'high', pay: { 3: 0.9,  4: 1.5,  5: 2.0,  6: 3.0 }, weight: 5,  build: () => imgSym('image 639.png') }, // Zeus
+    { id: 'ATHENA',    kind: 'high', pay: { 3: 0.6,  4: 0.9,  5: 1.4,  6: 2.0 }, weight: 6,  build: () => imgSym('image 638.png') }, // Athena
+    { id: 'APHRODITE', kind: 'high', pay: { 3: 0.45, 4: 0.75, 5: 1.05, 6: 1.5 }, weight: 7,  build: () => imgSym('image 640.png') }, // Aphrodite
+    { id: 'HEART',     kind: 'low',  pay: { 3: 0.3,  4: 0.6,  5: 0.9,  6: 1.2 }, weight: 9,  build: () => imgSym('image 641.png') }, // red heart
+    { id: 'SPADE',     kind: 'low',  pay: { 3: 0.25, 4: 0.45, 5: 0.7,  6: 1.0 }, weight: 10, build: () => imgSym('image 642.png') }, // purple spade
+    { id: 'DIAMOND',   kind: 'low',  pay: { 3: 0.2,  4: 0.4,  5: 0.6,  6: 0.9 }, weight: 11, build: () => imgSym('image 643.png') }, // green diamond
+    { id: 'CLUB',      kind: 'low',  pay: { 3: 0.15, 4: 0.3,  5: 0.45, 6: 0.6 }, weight: 12, build: () => imgSym('image 644.png') }, // blue club
   ];
 
   // Pre-render each symbol's SVG once (they are static) and index by id.
@@ -424,7 +262,7 @@
     DEFS,
     REGISTRY,
     order: DEFS.map((d) => d.id),
-    paytableOrder: ['RED', 'PURPLE', 'GOLD', 'GREEN', 'BLUE', 'SCROLL', 'A', 'K', 'Q'],
+    paytableOrder: ['ZEUS', 'ATHENA', 'APHRODITE', 'HEART', 'SPADE', 'DIAMOND', 'CLUB'],
     get: (id) => REGISTRY[id],
     buildWild,
     buildFrameOverlay,
