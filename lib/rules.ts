@@ -1,15 +1,14 @@
 /* =============================================================================
    Aether Dynasty — rules content (mirrors the reference instruction screens)
    Consumed by the controller to populate the paginated rules modal.
-
-   Ported to an ES module: the original IIFE attached `window.GTRules`; this
-   module exports the same array.
    ============================================================================= */
 
-const PAGES = [
+import type { RulePage } from "@/lib/types";
+
+const PAGES: RulePage[] = [
   {
-    tab: 'Rules',
-    title: 'Game Rules',
+    tab: "Rules",
+    title: "Game Rules",
     html: `
       <div class="quickstart">
         <div class="qs"><span class="qs-n">1</span><div><b>Set your bet</b><p>Tap &minus; / + to choose your stake, then press SPIN.</p></div></div>
@@ -32,8 +31,8 @@ const PAGES = [
          a gap breaks the chain = <span class="no">NO</span>.</p>`,
   },
   {
-    tab: 'Wild',
-    title: 'Wild',
+    tab: "Wild",
+    title: "Wild",
     html: `
       <div class="rule-sym-row" id="wildSymRow"></div>
       <ol class="rules-list">
@@ -47,8 +46,8 @@ const PAGES = [
       </ol>`,
   },
   {
-    tab: 'Golden Frame',
-    title: 'Golden Frame',
+    tab: "Golden Frame",
+    title: "Golden Frame",
     html: `
       <div class="rule-sym-row" id="frameSymRow"></div>
       <ol class="rules-list">
@@ -57,8 +56,8 @@ const PAGES = [
       </ol>`,
   },
   {
-    tab: 'Free Game',
-    title: 'Free Game',
+    tab: "Free Game",
+    title: "Free Game",
     html: `
       <ol class="rules-list">
         <li>In each main game, when symbols land a winning combination and are eliminated, the symbols surrounding the
@@ -75,16 +74,16 @@ const PAGES = [
       </ol>`,
   },
   {
-    tab: 'Paytable',
-    title: 'Paytable',
+    tab: "Paytable",
+    title: "Paytable",
     html: `
       <p class="rule-note">Payouts are shown at <b>bet = 3</b>. This game uses a dynamic paytable; displayed pays reflect
          the amount for achieving the combination at the selected bet level.</p>
       <div class="paytable-grid" id="paytableGrid"></div>`,
   },
   {
-    tab: 'Payout',
-    title: 'Payout Information',
+    tab: "Payout",
+    title: "Payout Information",
     html: `
       <ol class="rules-list">
         <li>A game round is immediately ended when the maximum payout multiplier is reached, and all winnings are paid out.</li>
@@ -101,6 +100,6 @@ const PAGES = [
   },
 ];
 
-export const GTRules = PAGES;
+export const GTRules: RulePage[] = PAGES;
 
 export default GTRules;

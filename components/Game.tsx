@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { boot } from '@/game/controller';
+import { useEffect } from "react";
+import { boot } from "@/lib/controller";
 
 /**
  * The whole game is a single imperative controller that mutates the DOM by id.

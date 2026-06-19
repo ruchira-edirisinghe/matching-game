@@ -3,9 +3,9 @@
 A from-scratch browser slot built to a classic expanding-ways spec, rebranded
 with a **futuristic-meets-historical** identity ("Neon Antiquity"): an ancient
 temple lit by torches, wrapped in a glowing holographic / stargate aesthetic.
-Built with **Next.js** (App Router). Board symbols are painted PNGs
-(`public/assets/match-assets/`); the torches, ornate frames and the rotating
-astrolabe rune-ring are still generated as **dynamic SVG** at runtime.
+Built with **Next.js** (App Router) and **TypeScript**. Board symbols are
+painted PNGs (`public/assets/match-assets/`); the torches, ornate frames and the
+rotating astrolabe rune-ring are still generated as **dynamic SVG** at runtime.
 
 ### Look & type system
 - **Fonts:** `Orbitron` (futuristic readouts — brand, ways counter, HUD numbers,
@@ -55,30 +55,33 @@ again = super turbo) · **Auto** (pick a count) · **Sound** · **History** · t
 
 ## Project layout
 
+Root-level `app/`, `components/`, and `lib/` (the `@/*` import alias maps to the
+project root). All source is TypeScript (`.ts` / `.tsx`).
+
 | File | Purpose |
 |------|---------|
-| `src/app/layout.js` | Root layout: metadata, viewport, fonts, favicons |
-| `src/app/page.js` | Route that renders the game |
-| `src/app/globals.css` | Temple theme, layout, all animations |
-| `src/components/Game.js` | Client component: renders the markup (HUD, modals, overlay) once and boots the controller in `useEffect` |
-| `src/game/symbols.js` | Symbol library: painted-PNG board symbols, wild/frame overlays, decorative SVG (torch, rune-ring…) + registry & paytable |
-| `src/game/engine.js` | Pure game logic: ways evaluation, cascades, expansion, wilds, free game, payout cap |
-| `src/game/rules.js` | Rules/paytable content (mirrors the instruction screens) |
-| `src/game/controller.js` | Rendering, spin/cascade animation, controls, sound, modals (exports `boot()`) |
+| `app/layout.tsx` | Root layout: metadata, viewport, fonts, favicons |
+| `app/page.tsx` | Route that renders the game |
+| `app/globals.css` | Temple theme, layout, all animations |
+| `components/Game.tsx` | Client component: renders the markup (HUD, modals, overlay) once and boots the controller in `useEffect` |
+| `lib/types.ts` | Shared domain types (`Cell`, `Board`, `Cascade`, `SpinResult`, `Engine`, …) |
+| `lib/symbols.ts` | Symbol library: painted-PNG board symbols, wild/frame overlays, decorative SVG (torch, rune-ring…) + registry & paytable |
+| `lib/engine.ts` | Pure game logic: ways evaluation, cascades, expansion, wilds, free game, payout cap |
+| `lib/rules.ts` | Rules/paytable content (mirrors the instruction screens) |
+| `lib/controller.ts` | Rendering, spin/cascade animation, controls, sound, modals (exports `boot()`) |
 | `public/assets/` | Painted PNGs, GIFs, button art, favicons (served from the site root) |
 
-The game logic is unchanged from the original vanilla build — the IIFE `window`
-globals were converted to ES modules, the markup became a React client
-component, and `main.js`'s `DOMContentLoaded` boot became `boot()`, called from
-`useEffect`. The component has no React state, so it renders once and the
-controller drives all updates imperatively (by element id) exactly as before.
+The game is a single imperative controller that drives the DOM by element id.
+`components/Game.tsx` renders the markup once (it holds no React state, so it
+never re-renders) and `boot()` wires everything up from `useEffect` after mount,
+returning a cleanup that detaches the document-level key listeners.
 
 ## Notes
 
 The engine was validated over 300k simulated spins: free game triggers ~1 in
 640 spins, the multiplier/free-game loop always terminates, and the published
 payout cap (10,000× bet) is enforced. The reel weights give a demo RTP of ~76%
-against the on-screen paytable — tune `weight`/`pay` in `js/symbols.js` to taste.
+against the on-screen paytable — tune `weight`/`pay` in `lib/symbols.ts` to taste.
 
 Open with `?autospin=1`, `?rules=<n>`, or `?free=1` to jump straight to a state
 (handy for debugging / screenshots).

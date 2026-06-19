@@ -1,0 +1,674 @@
+/* =============================================================================
+   Aether Dynasty — UI controller (render + animation + controls)
+   ---------------------------------------------------------------------------
+   Ported from the original `main.js` IIFE. Instead of booting on
+   `DOMContentLoaded`, the work is exposed as `boot()`, which a client React
+   component calls from `useEffect` once the markup is mounted. `boot()` returns
+   a cleanup function that detaches the document-level key listeners (so Fast
+   Refresh / unmount don't stack duplicate handlers).
+   ============================================================================= */
+
+import { GTSymbols } from "@/lib/symbols";
+import { GTEngine } from "@/lib/engine";
+import { GTRules } from "@/lib/rules";
+import type { Board, Cascade, Cell, Engine, Heights, SymbolId } from "@/lib/types";
+
+declare global {
+  interface Window {
+    GT?: {
+      engine: Engine;
+      doSpin: () => void;
+      render: (animateDrop?: boolean, breakFill?: boolean) => void;
+      state: () => { b: Board; h: Heights };
+    };
+    __showRulePage?: (i: number) => void;
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
+
+interface HistoryEntry {
+  time: string;
+  type: "spin" | "free";
+  bet: number;
+  win: number;
+  balance: number;
+}
+
+export function boot(): () => void {
+  const S = GTSymbols;
+  const COLS = GTEngine.COLS;     // 6
+  const ROWS = GTEngine.MAX_ROWS; // 6
+
+  const engine = GTEngine.create({ balance: 50000, bet: 3 });
+
+  // ---- DOM refs --------------------------------------------------------------
+  const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
+  let boardEl: HTMLElement, cascadeFx: HTMLElement;
+  let cells: HTMLElement[][] = [];
+  let balValEl: HTMLElement, betValEl: HTMLElement, winValEl: HTMLElement, waysNumEl: HTMLElement, winPopEl: HTMLElement;
+  let btnSpin: HTMLElement, btnAuto: HTMLElement, btnTurbo: HTMLElement;
+
+  // ---- runtime state ---------------------------------------------------------
+  let currentBoard: Board = [], currentHeights: Heights = [];
+  let spinning = false, skip = false;
+  let turbo = 0;                 // 0 = off, 1 = turbo, 2 = super turbo
+  let soundOn = true;
+  let autoRemaining = 0, autoInfinite = false;
+  let autoSelected: number | "inf" = 10;
+  let shownBalance = engine.balance;
+  const history: HistoryEntry[] = [];   // transaction log, newest first
+
+  // document-level listeners to detach on cleanup
+  const teardown: Array<() => void> = [];
+
+  const speed = (): number => (skip ? 0.001 : turbo === 2 ? 0.28 : turbo === 1 ? 0.5 : 1);
+  const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, Math.max(0, ms * speed())));
+
+  // ---- formatting ------------------------------------------------------------
+  const fmtMoney = (n: number): string => Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtInt = (n: number): string => Math.round(n).toLocaleString("en-US");
+
+  // =============================================================================
+  // Boot (runs once the React markup is mounted)
+  // =============================================================================
+  function init(): void {
+    $("filter-defs").innerHTML = S.FILTER_DEFS;
+
+    // decorative art
+    $("runeRing").innerHTML = S.art.techRune();
+
+    boardEl = $("board"); cascadeFx = $("cascadeFx");
+    balValEl = $("balVal"); betValEl = $("betVal"); winValEl = $("winVal");
+    waysNumEl = $("waysNum"); winPopEl = $("winPop");
+    btnSpin = $("btnSpin"); btnAuto = $("btnAuto"); btnTurbo = $("btnTurbo");
+
+    buildBoardDOM();
+    wireControls();
+    buildRules();
+    buildAutoGrid();
+
+    // initial idle board
+    const idle = engine.idleBoard();
+    currentBoard = idle.board; currentHeights = idle.heights;
+    renderBoard(true);
+    setWaysInstant(engine.waysOf(currentHeights));
+    setBalanceInstant(engine.balance);
+    betValEl.textContent = String(engine.bet);
+    winValEl.textContent = "0.00";
+
+    // headless / debug hooks
+    window.GT = { engine, doSpin, render: renderBoard, state: () => ({ b: currentBoard, h: currentHeights }) };
+    if (/[?&]autospin/.test(location.search)) {
+      autoInfinite = true; btnAuto.classList.add("on"); updateAutoBtn(); refreshSpinBtn();
+      setTimeout(doSpin, 200);
+    }
+    if (/[?&]rules/.test(location.search)) {
+      $("rulesModal").hidden = false;
+      const m = location.search.match(/rules=(\d)/); if (m) window.__showRulePage?.(+m[1]);
+    }
+    if (/[?&]free/.test(location.search)) {
+      engine.st.inFree = true; engine.st.freeLeft = 6; engine.st.freeTotal = 6; engine.st.mult = 2;
+      engine.st.goldenTreasureUsed = false;
+      setTimeout(() => { setSpinning(true); runFreeGames().then(() => setSpinning(false)); }, 250);
+    }
+  }
+
+  // =============================================================================
+  // Board rendering
+  // =============================================================================
+  function buildBoardDOM(): void {
+    boardEl.innerHTML = "";
+    cells = [];
+    for (let c = 0; c < COLS; c++) {
+      const reel = document.createElement("div");
+      reel.className = "reel";
+      const colCells: HTMLElement[] = [];
+      for (let r = 0; r < ROWS; r++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        reel.appendChild(cell);
+        colCells.push(cell);
+      }
+      cells.push(colCells);
+      boardEl.appendChild(reel);
+    }
+  }
+
+  function renderCell(el: HTMLElement, cell: Cell | null, animateDrop?: boolean, dropDelay?: number, breakFill?: boolean): void {
+    const wasEmpty = el.classList.contains("locked");
+    el.className = "cell";
+    el.innerHTML = "";
+    if (!cell) { el.classList.add("locked"); return; }
+    const sym = document.createElement("div");
+    sym.className = "sym";
+    sym.innerHTML = cell.wild ? S.buildWild(cell.wildN) : S.get(cell.id as SymbolId).svgHTML;
+    el.appendChild(sym);
+    if (cell.frame) {
+      const f = document.createElement("div");
+      f.innerHTML = S.buildFrameOverlay();
+      el.appendChild(f.firstElementChild!);
+    }
+    // a caramel (locked-cell) box being replaced: break it first, then let the
+    // symbol pass into the spot. Only genuine empty/caramel boxes break this way.
+    if (breakFill && wasEmpty) {
+      el.classList.add("break-fill");
+      const brk = document.createElement("div");
+      brk.className = "break-fx";
+      brk.addEventListener("animationend", () => brk.remove());
+      el.appendChild(brk);
+    } else if (animateDrop && cell.fresh) {
+      el.classList.add("drop");
+      sym.style.animationDelay = (dropDelay || 0) + "s";
+    }
+  }
+
+  function renderBoard(animateDrop?: boolean, breakFill?: boolean): void {
+    for (let c = 0; c < COLS; c++) {
+      const h = currentHeights[c];
+      for (let r = 0; r < ROWS; r++) {
+        const cell = r < h ? currentBoard[c][r] : null;
+        renderCell(cells[c][r], cell, animateDrop, r * 0.035 + c * 0.02, breakFill);
+      }
+    }
+  }
+
+  // =============================================================================
+  // HUD helpers (animated counters)
+  // =============================================================================
+  function animateNumber(setter: (v: number) => void, from: number, to: number, dur: number): Promise<void> {
+    const t0 = performance.now();
+    const d = Math.max(60, dur * (skip ? 0.05 : 1));
+    return new Promise((res) => {
+      function tick(t: number) {
+        const k = Math.min(1, (t - t0) / d);
+        const e = 1 - Math.pow(1 - k, 3);
+        setter(from + (to - from) * e);
+        if (k < 1) requestAnimationFrame(tick); else { setter(to); res(); }
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  const setBalanceInstant = (n: number): void => { shownBalance = n; balValEl.textContent = fmtMoney(n); };
+  function animateBalanceTo(n: number): Promise<void> {
+    return animateNumber((v) => { shownBalance = v; balValEl.textContent = fmtMoney(v); }, shownBalance, n, 500);
+  }
+  const setWaysInstant = (n: number): void => { waysNumEl.textContent = fmtInt(n); };
+  function animateWaysTo(n: number): Promise<void> {
+    const from = parseInt((waysNumEl.textContent || "").replace(/,/g, ""), 10) || 0;
+    return animateNumber((v) => { waysNumEl.textContent = fmtInt(v); }, from, n, 400);
+  }
+  function setWin(n: number): void { winValEl.textContent = fmtMoney(n); }
+
+  function showWinPop(text: string, big?: boolean): void {
+    winPopEl.textContent = text;
+    winPopEl.style.fontSize = big ? "clamp(28px,7vw,58px)" : "clamp(20px,4vw,34px)";
+    winPopEl.classList.remove("show"); void winPopEl.offsetWidth; winPopEl.classList.add("show");
+  }
+
+  // =============================================================================
+  // Sound (tiny WebAudio blips, fully optional)
+  // =============================================================================
+  let actx: AudioContext | null = null;
+  function beep(freq: number, dur: number, type?: OscillatorType, vol?: number): void {
+    if (!soundOn) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext!)();
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type || "triangle"; o.frequency.value = freq;
+      g.gain.value = vol || 0.05;
+      o.connect(g); g.connect(actx.destination);
+      const t = actx.currentTime;
+      g.gain.setValueAtTime(g.gain.value, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.start(t); o.stop(t + dur);
+    } catch { /* ignore */ }
+  }
+  const sndSpin = (): void => beep(180, 0.18, "sawtooth", 0.04);
+  const sndWin = (i: number): void => beep(440 + Math.min(i, 8) * 70, 0.16, "triangle", 0.06);
+  const sndDrop = (): void => beep(120, 0.08, "square", 0.03);
+  const sndBig = (): void => { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.25, "triangle", 0.07), i * 90)); };
+
+  // =============================================================================
+  // Spin flow
+  // =============================================================================
+  function setSpinning(on: boolean): void {
+    spinning = on;
+    btnSpin.classList.toggle("spinning", on);
+    [$("betMinus"), $("betPlus")].forEach((b) => { (b as HTMLButtonElement).disabled = on; });
+    refreshSpinBtn();
+  }
+
+  // the big spin button doubles as the auto-spin countdown + STOP control
+  function refreshSpinBtn(): void {
+    const autoActive = autoInfinite || autoRemaining > 0;
+    btnSpin.classList.toggle("autoact", autoActive);
+    btnSpin.title = autoActive ? "Stop auto spin" : "Spin";
+  }
+
+  // pressing spin (or Space): stop auto-spin if it's running, otherwise spin
+  function handleSpinPress(): void {
+    if (autoInfinite || autoRemaining > 0) { stopAuto(); skip = true; return; }
+    doSpin();
+  }
+
+  async function preSpin(): Promise<void> {
+    // quick shuffle illusion on the active cells
+    const frames = turbo === 2 ? 2 : turbo === 1 ? 3 : 5;
+    for (let f = 0; f < frames; f++) {
+      for (let c = 0; c < COLS; c++) {
+        for (let r = 0; r < currentHeights[c]; r++) {
+          const sym = cells[c][r].querySelector(".sym");
+          if (sym) sym.innerHTML = S.get(S.order[(Math.random() * S.order.length) | 0]).svgHTML;
+        }
+      }
+      sndSpin();
+      await sleep(55);
+    }
+  }
+
+  async function doSpin(): Promise<void> {
+    if (spinning) { skip = true; return; }
+    if (!engine.inFree && !engine.canSpin()) { flashInsufficient(); return; }
+
+    skip = false;
+    setSpinning(true);
+    setWin(0);
+    const prevBal = engine.balance;
+
+    await preSpin();
+
+    const result = engine.spin();
+
+    // deduct bet visually (base game only)
+    if (!result.freeMode) setBalanceInstant(prevBal - engine.bet);
+
+    // land the initial board
+    currentBoard = result.initial.board;
+    currentHeights = result.initial.heights;
+    renderBoard(true);
+    sndDrop();
+    await animateWaysTo(result.initial.ways);
+    await sleep(280);
+
+    // play cascades
+    let runWin = 0;
+    for (let i = 0; i < result.cascades.length; i++) {
+      await playCascade(result.cascades[i], i);
+      runWin += result.cascades[i].totalWin;
+      setWin(runWin);
+      await animateBalanceTo((result.freeMode ? prevBal : prevBal - engine.bet) + runWin);
+    }
+
+    // reconcile balance exactly with the engine
+    await animateBalanceTo(engine.balance);
+    recordHistory("spin", engine.bet, runWin, engine.balance);
+
+    // feature transitions — keep the spin locked while overlays / free games
+    // run so a stray Space or button press can't start a concurrent spin
+    if (result.triggeredFree) {
+      await featureOverlay("FREE GAME", "You reached 46,656 WAYS!", "6 Free Games", 1600);
+      const freeWin = await runFreeGames();
+      recordHistory("free", 0, freeWin, engine.balance);
+    } else if (runWin >= engine.bet * 20) {
+      sndBig();
+      await featureOverlay(runWin >= engine.bet * 60 ? "MEGA WIN" : "BIG WIN", "", "Rs " + fmtMoney(runWin), 1700, true);
+    }
+
+    setSpinning(false);
+
+    // autospin continuation
+    if (autoRemaining > 0 || autoInfinite) {
+      if (!autoInfinite) autoRemaining--;
+      $("btnAuto").classList.toggle("on", autoRemaining > 0 || autoInfinite);
+      updateAutoBtn(); refreshSpinBtn();
+      if ((autoRemaining > 0 || autoInfinite) && engine.canSpin()) {
+        await sleep(450);
+        if (autoRemaining > 0 || autoInfinite) doSpin();   // user may have stopped during the gap
+      } else { stopAuto(); }
+    }
+  }
+
+  async function playCascade(casc: Cascade, index: number): Promise<void> {
+    // 1) highlight winning cells
+    casc.winCells.forEach(([c, r]) => { if (cells[c] && cells[c][r]) cells[c][r].classList.add("win"); });
+    if (casc.golden) showWinPop("GOLDEN TREASURE!", true);
+    else showWinPop("Rs " + fmtMoney(casc.totalWin) + (casc.mult > 1 ? "  x" + casc.mult : ""), casc.totalWin >= engine.bet * 10);
+    sndWin(index);
+    spawnSparks(casc.winCells);
+    await sleep(620);
+
+    // 2) eliminate / transform / decrement
+    casc.removed.forEach(([c, r]) => cells[c][r].classList.add("clear"));
+    casc.blast.forEach(([c, r]) => cells[c][r].classList.add("clear"));
+    spawnMagic(casc.removed.concat(casc.blast));
+    casc.transformed.forEach(({ c, r, n }) => {
+      const el = cells[c][r];
+      el.classList.remove("win"); el.classList.add("transform");
+      const sym = el.querySelector(".sym");
+      if (sym) sym.innerHTML = S.buildWild(n);
+      const f = el.querySelector(".frame-overlay"); if (f) f.remove();
+    });
+    casc.decremented.forEach(({ c, r, n }) => {
+      const sym = cells[c][r].querySelector(".sym");
+      if (sym) sym.innerHTML = S.buildWild(n);
+      cells[c][r].classList.add("transform");
+    });
+    sndDrop();
+    await sleep(440);   // matched symbols pop / sparkle out
+
+    // 3) drop the resulting board — caramel boxes being replaced break first, then symbols pass in
+    currentBoard = casc.resultBoard;
+    currentHeights = casc.resultHeights;
+    renderBoard(true, true);
+    casc.expandCols.forEach((c) => {
+      const r = casc.resultHeights[c] - 1;
+      if (cells[c][r]) cells[c][r].classList.add("unlock");
+    });
+    if (casc.expandCols.length) beep(660, 0.12, "triangle", 0.05);
+    await animateWaysTo(casc.waysAfter);
+    await sleep(360);
+  }
+
+  function spawnSparks(winCells: number[][]): void {
+    if (turbo === 2) return;
+    const wr = cascadeFx.getBoundingClientRect();
+    winCells.slice(0, 24).forEach(([c, r]) => {
+      const el = cells[c]?.[r];
+      if (!el) return;
+      const b = el.getBoundingClientRect();
+      const s = document.createElement("div");
+      s.className = "spark";
+      s.style.left = (b.left - wr.left + b.width / 2) + "px";
+      s.style.top = (b.top - wr.top + b.height / 2) + "px";
+      s.style.setProperty("--dx", ((Math.random() - 0.5) * 60) + "px");
+      s.style.setProperty("--dy", ((Math.random() - 0.5) * 60) + "px");
+      cascadeFx.appendChild(s);
+      setTimeout(() => s.remove(), 700);
+    });
+  }
+
+  // magical sparkle burst when matched boxes pop away (stars + glitter)
+  const MAGIC_COLS: string[][] = [["#ffffff", "#ffd24a"], ["#bfefff", "#43e8ff"], ["#e9c6ff", "#a64bff"], ["#fff6c8", "#ffae3a"]];
+  function spawnMagic(popCells: Array<[number, number]>): void {
+    if (turbo === 2) return;
+    const perCell = turbo === 1 ? 5 : 8;
+    const wr = cascadeFx.getBoundingClientRect();
+    popCells.slice(0, 18).forEach(([c, r]) => {
+      const el = cells[c]?.[r];
+      if (!el) return;
+      const b = el.getBoundingClientRect();
+      const cx = b.left - wr.left + b.width / 2;
+      const cy = b.top - wr.top + b.height / 2;
+      for (let i = 0; i < perCell; i++) {
+        const star = i % 2 === 0;
+        const p = document.createElement("div");
+        p.className = star ? "mstar" : "mglow";
+        const ang = Math.random() * Math.PI * 2;
+        const dist = 20 + Math.random() * 36;
+        const col = MAGIC_COLS[(Math.random() * MAGIC_COLS.length) | 0];
+        p.style.left = cx + "px";
+        p.style.top = cy + "px";
+        p.style.setProperty("--dx", (Math.cos(ang) * dist).toFixed(1) + "px");
+        p.style.setProperty("--dy", (Math.sin(ang) * dist).toFixed(1) + "px");
+        p.style.setProperty("--col", col[0]);
+        p.style.setProperty("--col2", col[1]);
+        p.style.setProperty("--sz", (star ? 9 + Math.random() * 10 : 4 + Math.random() * 5).toFixed(0) + "px");
+        p.style.setProperty("--dur", (0.55 + Math.random() * 0.35).toFixed(2) + "s");
+        cascadeFx.appendChild(p);
+        setTimeout(() => p.remove(), 1000);
+      }
+    });
+  }
+
+  // ---- free games -----------------------------------------------------------
+  async function runFreeGames(): Promise<number> {
+    const banner = $("freeBanner");
+    banner.hidden = false;
+    let freeTotalWin = 0;
+
+    while (engine.inFree && engine.st.freeLeft > 0) {
+      $("fgLeft").textContent = String(engine.st.freeLeft);
+      $("fgMult").textContent = String(engine.st.mult);
+      await sleep(420);
+
+      const res = engine.spin();
+      const before = engine.balance - res.totalWin;
+
+      currentBoard = res.initial.board; currentHeights = res.initial.heights;
+      renderBoard(true); sndDrop();
+      await animateWaysTo(res.initial.ways);
+      await sleep(250);
+
+      let runWin = 0;
+      for (let i = 0; i < res.cascades.length; i++) {
+        const casc = res.cascades[i];
+        if (casc.golden) await featureOverlay("GOLDEN TREASURE", "The whole board transforms!", "", 1300);
+        await playCascade(casc, i);
+        runWin += casc.totalWin;
+        setWin(runWin);
+        await animateBalanceTo(before + runWin);
+      }
+      freeTotalWin += runWin;
+      $("fgLeft").textContent = String(res.freeLeft);
+      $("fgMult").textContent = String(res.mult);
+      if (res.extraFree > 0) showWinPop("+" + res.extraFree + " FREE GAME", false);
+
+      await animateBalanceTo(engine.balance);
+      await sleep(300);
+      if (res.freeEnded) break;
+    }
+
+    banner.hidden = true;
+    await featureOverlay("FREE GAME OVER", "Total Free Game Win", "Rs " + fmtMoney(freeTotalWin), 1900, true);
+    setWin(freeTotalWin);
+    return freeTotalWin;
+  }
+
+  // ---- overlays -------------------------------------------------------------
+  function featureOverlay(title: string, sub: string, amount: string, holdMs: number, coins?: boolean): Promise<void> {
+    const ov = $("overlay"), inner = $("overlayInner");
+    inner.innerHTML =
+      `<div class="ov-title">${title}</div>` +
+      (sub ? `<div class="ov-sub">${sub}</div>` : "") +
+      (amount ? `<div class="ov-amount">${amount}</div>` : "") +
+      `<div class="ov-tap">TAP TO CONTINUE</div>`;
+    ov.hidden = false;
+    if (coins) rainCoins(ov);
+    if (title.indexOf("WIN") >= 0 || title.indexOf("TREASURE") >= 0) sndBig();
+    return new Promise((res) => {
+      let done = false;
+      const finish = () => { if (done) return; done = true; ov.removeEventListener("click", finish); ov.hidden = true; ov.querySelectorAll(".ov-coin").forEach((c) => c.remove()); res(); };
+      ov.addEventListener("click", finish);
+      setTimeout(finish, skip ? 350 : holdMs);
+    });
+  }
+  function rainCoins(ov: HTMLElement): void {
+    for (let i = 0; i < 26; i++) {
+      const c = document.createElement("div");
+      c.className = "ov-coin";
+      c.style.left = Math.random() * 100 + "%";
+      c.style.animationDuration = (1.4 + Math.random() * 1.6) + "s";
+      c.style.animationDelay = (Math.random() * 0.8) + "s";
+      ov.appendChild(c);
+    }
+  }
+
+  function flashInsufficient(): void {
+    showWinPop("INSUFFICIENT BALANCE", false);
+    btnSpin.animate([{ transform: "translateX(-4px)" }, { transform: "translateX(4px)" }, { transform: "translateX(0)" }], { duration: 220, iterations: 2 });
+  }
+
+  // ---- transaction history --------------------------------------------------
+  function recordHistory(type: "spin" | "free", bet: number, win: number, balance: number): void {
+    history.unshift({ time: new Date().toLocaleTimeString(), type, bet, win, balance });
+    if (history.length > 500) history.length = 500;
+    if (!$("historyModal").hidden) renderHistory();   // live-update if the modal is open
+  }
+  function renderHistory(): void {
+    const list = $("historyList");
+    if (!history.length) { list.innerHTML = '<div class="history-empty">No spins yet — press SPIN to play.</div>'; return; }
+    list.innerHTML = history.map((h) => {
+      const win = h.win > 0
+        ? `<span class="history-win">+Rs ${fmtMoney(h.win)}</span>`
+        : `<span class="history-win zero">Rs 0.00</span>`;
+      const bet = h.type === "free" ? '<span class="history-tag">FREE</span>' : "Rs " + fmtInt(h.bet);
+      return `<div class="history-row"><span class="history-time">${h.time}</span><span>${bet}</span><span>${win}</span><span class="history-bal">Rs ${fmtMoney(h.balance)}</span></div>`;
+    }).join("");
+  }
+
+  // =============================================================================
+  // Controls
+  // =============================================================================
+  function wireControls(): void {
+    btnSpin.addEventListener("click", handleSpinPress);
+
+    const onSpaceKey = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      e.preventDefault();
+      // don't spin behind an open modal
+      if (!$("rulesModal").hidden || !$("autoModal").hidden || !$("historyModal").hidden) return;
+      handleSpinPress();
+    };
+    document.addEventListener("keydown", onSpaceKey);
+    teardown.push(() => document.removeEventListener("keydown", onSpaceKey));
+
+    $("betPlus").addEventListener("click", () => { if (spinning) return; engine.changeBet(1); betValEl.textContent = String(engine.bet); beep(520, 0.05, "square", 0.04); });
+    $("betMinus").addEventListener("click", () => { if (spinning) return; engine.changeBet(-1); betValEl.textContent = String(engine.bet); beep(420, 0.05, "square", 0.04); });
+
+    btnTurbo.addEventListener("click", () => {
+      turbo = (turbo + 1) % 3;
+      btnTurbo.classList.toggle("on", turbo > 0);
+      btnTurbo.classList.toggle("super", turbo === 2);
+      $("turboHint").textContent = turbo === 0 ? "Press turbo spin" : turbo === 1 ? "Turbo ON" : "Super Turbo ON";
+    });
+
+    btnAuto.addEventListener("click", () => {
+      if (autoRemaining > 0 || autoInfinite) { stopAuto(); return; }
+      $("autoModal").hidden = false;
+    });
+
+    $("btnSound").addEventListener("click", () => { soundOn = !soundOn; $("btnSound").classList.toggle("muted", !soundOn); $("btnSound").innerHTML = soundOn ? "&#128266;" : "&#128263;"; });
+    $("btnHistory").addEventListener("click", () => { renderHistory(); $("historyModal").hidden = false; });
+    $("historyClose").addEventListener("click", () => { $("historyModal").hidden = true; });
+    $("historyModal").addEventListener("click", (e) => { if (e.target === $("historyModal")) $("historyModal").hidden = true; });
+
+    // Esc closes whichever modal is open
+    const onEscKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") ["historyModal", "rulesModal", "autoModal"].forEach((id) => { if (!$(id).hidden) $(id).hidden = true; });
+    };
+    document.addEventListener("keydown", onEscKey);
+    teardown.push(() => document.removeEventListener("keydown", onEscKey));
+
+    // rules modal
+    $("btnRules").addEventListener("click", () => { $("rulesModal").hidden = false; });
+    $("rulesClose").addEventListener("click", () => { $("rulesModal").hidden = true; });
+    $("rulesModal").addEventListener("click", (e) => { if (e.target === $("rulesModal")) $("rulesModal").hidden = true; });
+
+    // autospin modal
+    $("autoClose").addEventListener("click", () => { $("autoModal").hidden = true; });
+    $("autoCancel").addEventListener("click", () => { $("autoModal").hidden = true; });
+    $("autoStart").addEventListener("click", () => {
+      $("autoModal").hidden = true;
+      if (autoSelected === "inf") { autoInfinite = true; autoRemaining = 0; }
+      else { autoInfinite = false; autoRemaining = autoSelected; }
+      btnAuto.classList.add("on");
+      updateAutoBtn(); refreshSpinBtn();
+      if (!spinning) doSpin();
+    });
+  }
+
+  function stopAuto(): void { autoRemaining = 0; autoInfinite = false; btnAuto.classList.remove("on"); updateAutoBtn(); refreshSpinBtn(); }
+
+  // ---- autospin count picker ------------------------------------------------
+  function buildAutoGrid(): void {
+    const grid = $("autoGrid");
+    const opts: Array<number | "∞"> = [10, 25, 50, 100, 250, 500, 1000, "∞"];
+    grid.innerHTML = "";
+    opts.forEach((o) => {
+      const b = document.createElement("button");
+      b.textContent = String(o);
+      b.addEventListener("click", () => {
+        grid.querySelectorAll("button").forEach((x) => x.classList.remove("sel"));
+        b.classList.add("sel");
+        autoSelected = o === "∞" ? "inf" : o;
+        setAutoDisplay();
+      });
+      grid.appendChild(b);
+    });
+    grid.firstElementChild?.classList.add("sel");
+    autoSelected = 10;
+    setAutoDisplay();
+  }
+
+  // big readout in the auto-spin modal mirrors the chosen count
+  function setAutoDisplay(): void {
+    const d = $("autoCountDisplay");
+    d.textContent = autoSelected === "inf" ? "∞" : String(autoSelected);
+  }
+
+  // the AUTO button shows the live remaining count while spinning (click = stop)
+  function updateAutoBtn(): void {
+    const txt = btnAuto.querySelector(".btn-text");
+    if (!txt) return;
+    txt.textContent = autoInfinite ? "∞" : autoRemaining > 0 ? String(autoRemaining) : "AUTO";
+    btnAuto.title = autoInfinite || autoRemaining > 0 ? "Stop auto spin" : "Auto spin";
+  }
+
+  // =============================================================================
+  // Rules modal content
+  // =============================================================================
+  function buildRules(): void {
+    const tabsEl = $("rulesTabs"), bodyEl = $("rulesBody");
+    const pages = GTRules;
+    tabsEl.innerHTML = "";
+    pages.forEach((p, i) => {
+      const b = document.createElement("button");
+      b.textContent = p.tab;
+      b.addEventListener("click", () => showRulePage(i));
+      tabsEl.appendChild(b);
+    });
+    function showRulePage(i: number): void {
+      Array.from(tabsEl.children).forEach((c, k) => c.classList.toggle("active", k === i));
+      bodyEl.innerHTML = `<h2>${pages[i].title}</h2>` + pages[i].html;
+      // hydrate dynamic symbol demos
+      const wr = bodyEl.querySelector("#wildSymRow");
+      if (wr) { [1, 2, 3].forEach((n) => wr.appendChild(demoCell(S.buildWild(n)))); }
+      const fr = bodyEl.querySelector("#frameSymRow");
+      if (fr) {
+        const d = demoCell(S.get("ZEUS").svgHTML);
+        d.appendChild(frameWrap());
+        fr.appendChild(d);
+      }
+      const pg = bodyEl.querySelector("#paytableGrid");
+      if (pg) buildPaytable(pg as HTMLElement);
+    }
+    window.__showRulePage = showRulePage;
+    showRulePage(0);
+  }
+
+  function demoCell(svgHTML: string): HTMLDivElement {
+    const d = document.createElement("div"); d.className = "demo";
+    d.innerHTML = svgHTML; return d;
+  }
+  function frameWrap(): Element { const w = document.createElement("div"); w.innerHTML = S.buildFrameOverlay(); return w.firstElementChild!; }
+
+  function buildPaytable(grid: HTMLElement): void {
+    grid.innerHTML = "";
+    S.paytableOrder.forEach((id, idx) => {
+      const def = S.get(id);
+      const card = document.createElement("div");
+      card.className = "pt-card" + (idx === 0 ? " top" : "");
+      const pays = [6, 5, 4, 3].map((k) => `<div>${k} &times; <b>${def.pay[k]}</b></div>`).join("");
+      card.innerHTML = `<div class="pt-icon">${def.svgHTML}</div><div class="pt-pays">${pays}</div>`;
+      grid.appendChild(card);
+    });
+  }
+
+  // Run the boot sequence now that every declaration above is initialised, then
+  // hand back a cleanup that detaches the document-level key listeners.
+  init();
+  return () => { teardown.forEach((fn) => fn()); };
+}
+
+export default boot;

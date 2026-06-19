@@ -4,23 +4,25 @@
    (Greek gods + card suits + wild chalice), wrapped in a 0 0 100 100 SVG so
    they reuse the same sizing / glow pipeline as the generated decorative art.
    Decorative elements (torches, rune-ring, etc.) are still generated as SVG.
-
-   Ported to an ES module: the original IIFE attached `window.GTSymbols`; this
-   module exports the same object so the engine / controller can import it.
    ============================================================================= */
+
+import type { SymbolDef, SymbolId, RegistryEntry } from "@/lib/types";
 
 // ---- small helpers ---------------------------------------------------------
 let _uid = 0;
-const uid = (p) => `${p}${(_uid++).toString(36)}`;
+const uid = (p: string): string => `${p}${(_uid++).toString(36)}`;
 
 // Wrap raw inner SVG into a full <svg> with a 0 0 100 100 viewBox.
-function svg(inner, extra) {
-  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" ${extra || ''}>${inner}</svg>`;
+function svg(inner: string, extra?: string): string {
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" ${extra || ""}>${inner}</svg>`;
 }
 
 // A reusable radial/linear gradient stop string.
-function stops(list) {
-  return list.map((s) => `<stop offset="${s[0]}" stop-color="${s[1]}"${s[2] != null ? ` stop-opacity="${s[2]}"` : ''}/>`).join('');
+type GradientStop = [number, string, number?];
+function stops(list: GradientStop[]): string {
+  return list
+    .map((s) => `<stop offset="${s[0]}" stop-color="${s[1]}"${s[2] != null ? ` stop-opacity="${s[2]}"` : ""}/>`)
+    .join("");
 }
 
 /* ---------------------------------------------------------------------------
@@ -32,8 +34,8 @@ function stops(list) {
    Paths are root-absolute (/assets/…) so they resolve from Next's public dir
    regardless of the current route.
    --------------------------------------------------------------------------- */
-const ASSET_DIR = '/assets/match-assets/';
-function imgSym(file) {
+const ASSET_DIR = "/assets/match-assets/";
+function imgSym(file: string): string {
   const href = encodeURI(ASSET_DIR + file);
   return svg(`<image href="${href}" x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid meet"/>`);
 }
@@ -41,14 +43,14 @@ function imgSym(file) {
 /* ---------------------------------------------------------------------------
    WILD — painted golden chalice. `n` shows the elimination counter badge.
    --------------------------------------------------------------------------- */
-function wild(n) {
-  const href = encodeURI(ASSET_DIR + 'wildcard.png');
-  const badge = (n && n >= 2) ? `
+function wild(n: number): string {
+  const href = encodeURI(ASSET_DIR + "wildcard.png");
+  const badge = n && n >= 2 ? `
     <g filter="url(#softGlow)">
       <circle cx="77" cy="77" r="16" fill="#7a1414" stroke="#ffd86a" stroke-width="3"/>
       <text x="77" y="78" text-anchor="middle" dominant-baseline="central"
         font-family="Georgia,serif" font-weight="700" font-size="20" fill="#ffe9a8">${n}</text>
-    </g>` : '';
+    </g>` : "";
   return svg(`
     <image href="${href}" x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid meet"/>
     ${badge}`);
@@ -57,13 +59,13 @@ function wild(n) {
 /* ---------------------------------------------------------------------------
    GOLDEN FRAME — ornate border overlay (drawn around a wrapped symbol).
    --------------------------------------------------------------------------- */
-function frameOverlay() {
-  const g = uid('fr');
+function frameOverlay(): string {
+  const g = uid("fr");
   return `
     <svg viewBox="0 0 100 100" class="frame-overlay" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
       <defs>
         <linearGradient id="${g}" x1="0" y1="0" x2="1" y2="1">
-          ${stops([[0, '#fff0a8'], [0.5, '#e3a92e'], [1, '#9a6512']])}
+          ${stops([[0, "#fff0a8"], [0.5, "#e3a92e"], [1, "#9a6512"]])}
         </linearGradient>
       </defs>
       <g fill="none" stroke="url(#${g})" stroke-width="4">
@@ -89,16 +91,16 @@ function frameOverlay() {
    --------------------------------------------------------------------------- */
 
 // Animated torch flame — markup contains its own CSS-driven flicker via classes.
-function torch() {
-  const gFlame = uid('tf'), gMetal = uid('tm');
+function torch(): string {
+  const gFlame = uid("tf"), gMetal = uid("tm");
   return `
     <svg viewBox="0 0 60 160" xmlns="http://www.w3.org/2000/svg" class="torch-svg">
       <defs>
         <radialGradient id="${gFlame}" cx="50%" cy="62%" r="55%">
-          ${stops([[0, '#fff7d6'], [0.4, '#ffd64a'], [0.75, '#ff7b1c'], [1, '#c01d05', 0]])}
+          ${stops([[0, "#fff7d6"], [0.4, "#ffd64a"], [0.75, "#ff7b1c"], [1, "#c01d05", 0]])}
         </radialGradient>
         <linearGradient id="${gMetal}" x1="0" y1="0" x2="0" y2="1">
-          ${stops([[0, '#6b5630'], [0.5, '#cdae6a'], [1, '#4a3a1d']])}
+          ${stops([[0, "#6b5630"], [0.5, "#cdae6a"], [1, "#4a3a1d"]])}
         </linearGradient>
       </defs>
       <!-- bracket -->
@@ -114,19 +116,19 @@ function torch() {
 }
 
 // Stylised explorer character (vector illustration, not photoreal).
-function character() {
-  const skin = uid('ch'), hair = uid('hr'), shirt = uid('sh');
+function character(): string {
+  const skin = uid("ch"), hair = uid("hr"), shirt = uid("sh");
   return `
     <svg viewBox="0 0 220 360" xmlns="http://www.w3.org/2000/svg" class="char-svg">
       <defs>
         <linearGradient id="${skin}" x1="0" y1="0" x2="0" y2="1">
-          ${stops([[0, '#ffe2c2'], [1, '#e7ad81']])}
+          ${stops([[0, "#ffe2c2"], [1, "#e7ad81"]])}
         </linearGradient>
         <linearGradient id="${hair}" x1="0" y1="0" x2="0" y2="1">
-          ${stops([[0, '#7a4a22'], [1, '#43230d']])}
+          ${stops([[0, "#7a4a22"], [1, "#43230d"]])}
         </linearGradient>
         <linearGradient id="${shirt}" x1="0" y1="0" x2="0" y2="1">
-          ${stops([[0, '#cfd6e6'], [1, '#9aa3bd']])}
+          ${stops([[0, "#cfd6e6"], [1, "#9aa3bd"]])}
         </linearGradient>
       </defs>
       <!-- torso / shirt -->
@@ -165,45 +167,45 @@ function character() {
 }
 
 // Temple pillar (repeated on the side frame).
-function pillar() {
-  const g = uid('pl');
+function pillar(): string {
+  const g = uid("pl");
   return `
     <svg viewBox="0 0 90 600" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" class="pillar-svg">
       <defs>
         <linearGradient id="${g}" x1="0" y1="0" x2="1" y2="0">
-          ${stops([[0, '#3a2f22'], [0.2, '#8a7350'], [0.5, '#c9b489'], [0.8, '#7a6443'], [1, '#2e2418']])}
+          ${stops([[0, "#3a2f22"], [0.2, "#8a7350"], [0.5, "#c9b489"], [0.8, "#7a6443"], [1, "#2e2418"]])}
         </linearGradient>
       </defs>
       <rect x="6" y="0" width="78" height="600" fill="url(#${g})"/>
       <rect x="0" y="0" width="90" height="40" fill="#6b5634"/>
       <rect x="0" y="560" width="90" height="40" fill="#6b5634"/>
-      ${Array.from({ length: 12 }, (_, i) => `<rect x="14" y="${50 + i * 44}" width="62" height="6" fill="#2e2418" opacity=".5"/>`).join('')}
-      ${Array.from({ length: 6 }, (_, i) => `<text x="45" y="${90 + i * 80}" text-anchor="middle" font-size="30" fill="#2e2418" opacity=".55" font-family="serif">𓂀</text>`).join('')}
+      ${Array.from({ length: 12 }, (_, i) => `<rect x="14" y="${50 + i * 44}" width="62" height="6" fill="#2e2418" opacity=".5"/>`).join("")}
+      ${Array.from({ length: 6 }, (_, i) => `<text x="45" y="${90 + i * 80}" text-anchor="middle" font-size="30" fill="#2e2418" opacity=".55" font-family="serif">𓂀</text>`).join("")}
     </svg>`;
 }
 
 // Astrolabe / stargate rune-ring — the "ancient-meets-futuristic" centerpiece
 // that glows and slowly rotates behind the reel board.
-function techRune() {
-  const glow = uid('rg');
-  const glyphs = ['𓂀', '𓆣', '𓋹', '𓊽', '𓁹', '𓃭', '𓏏', '𓇯', '◈', '⟁', '✶', '⌖', '◇', '⬡', '✦', '⟐'];
-  let glyphRing = '';
+function techRune(): string {
+  const glow = uid("rg");
+  const glyphs = ["𓂀", "𓆣", "𓋹", "𓊽", "𓁹", "𓃭", "𓏏", "𓇯", "◈", "⟁", "✶", "⌖", "◇", "⬡", "✦", "⟐"];
+  let glyphRing = "";
   for (let i = 0; i < glyphs.length; i++) {
     const a = (i / glyphs.length) * 360;
     glyphRing += `<text x="200" y="74" text-anchor="middle" font-size="20" fill="#ffd86a" transform="rotate(${a} 200 200)" opacity=".9" font-family="serif">${glyphs[i]}</text>`;
   }
-  let ticks = '';
+  let ticks = "";
   for (let i = 0; i < 60; i++) {
     const a = (i / 60) * 360, long = i % 5 === 0;
     ticks += `<line x1="200" y1="22" x2="200" y2="${long ? 36 : 28}" stroke="#43e8ff" stroke-width="${long ? 2 : 1}" transform="rotate(${a} 200 200)" opacity=".7"/>`;
   }
-  let circ = '';
+  let circ = "";
   for (let i = 0; i < 8; i++) { const a = (i / 8) * 360; circ += `<path d="M200,104 l0,18 m-11,0 l22,0" stroke="#7af9ff" stroke-width="1.4" fill="none" transform="rotate(${a} 200 200)" opacity=".6"/>`; }
   return `
     <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" class="rune-svg">
       <defs>
         <radialGradient id="${glow}" cx="50%" cy="50%" r="50%">
-          ${stops([[0, '#43e8ff', 0], [0.78, '#43e8ff', 0], [0.93, '#43e8ff', 0.22], [1, '#43e8ff', 0]])}
+          ${stops([[0, "#43e8ff", 0], [0.78, "#43e8ff", 0], [0.93, "#43e8ff", 0.22], [1, "#43e8ff", 0]])}
         </radialGradient>
       </defs>
       <circle cx="200" cy="200" r="198" fill="url(#${glow})"/>
@@ -233,23 +235,23 @@ function techRune() {
    Three Greek gods are the premium (high) symbols; the four card suits are
    the lower-paying symbols. Pays descend from Zeus down to the Club.
    --------------------------------------------------------------------------- */
-const DEFS = [
-  { id: 'ZEUS',      kind: 'high', pay: { 3: 0.9,  4: 1.5,  5: 2.0,  6: 3.0 }, weight: 5,  build: () => imgSym('zeus.png') },      // Zeus
-  { id: 'ATHENA',    kind: 'high', pay: { 3: 0.6,  4: 0.9,  5: 1.4,  6: 2.0 }, weight: 6,  build: () => imgSym('athena.png') },    // Athena
-  { id: 'APHRODITE', kind: 'high', pay: { 3: 0.45, 4: 0.75, 5: 1.05, 6: 1.5 }, weight: 7,  build: () => imgSym('aphrodite.png') }, // Aphrodite
-  { id: 'HEART',     kind: 'low',  pay: { 3: 0.3,  4: 0.6,  5: 0.9,  6: 1.2 }, weight: 9,  build: () => imgSym('heart.png') },     // red heart
-  { id: 'SPADE',     kind: 'low',  pay: { 3: 0.25, 4: 0.45, 5: 0.7,  6: 1.0 }, weight: 10, build: () => imgSym('spade.png') },     // purple spade
-  { id: 'DIAMOND',   kind: 'low',  pay: { 3: 0.2,  4: 0.4,  5: 0.6,  6: 0.9 }, weight: 11, build: () => imgSym('diamond.png') },   // green diamond
-  { id: 'CLUB',      kind: 'low',  pay: { 3: 0.15, 4: 0.3,  5: 0.45, 6: 0.6 }, weight: 12, build: () => imgSym('club.png') },      // blue club
+const DEFS: SymbolDef[] = [
+  { id: "ZEUS",      kind: "high", pay: { 3: 0.9,  4: 1.5,  5: 2.0,  6: 3.0 }, weight: 5,  build: () => imgSym("zeus.png") },      // Zeus
+  { id: "ATHENA",    kind: "high", pay: { 3: 0.6,  4: 0.9,  5: 1.4,  6: 2.0 }, weight: 6,  build: () => imgSym("athena.png") },    // Athena
+  { id: "APHRODITE", kind: "high", pay: { 3: 0.45, 4: 0.75, 5: 1.05, 6: 1.5 }, weight: 7,  build: () => imgSym("aphrodite.png") }, // Aphrodite
+  { id: "HEART",     kind: "low",  pay: { 3: 0.3,  4: 0.6,  5: 0.9,  6: 1.2 }, weight: 9,  build: () => imgSym("heart.png") },     // red heart
+  { id: "SPADE",     kind: "low",  pay: { 3: 0.25, 4: 0.45, 5: 0.7,  6: 1.0 }, weight: 10, build: () => imgSym("spade.png") },     // purple spade
+  { id: "DIAMOND",   kind: "low",  pay: { 3: 0.2,  4: 0.4,  5: 0.6,  6: 0.9 }, weight: 11, build: () => imgSym("diamond.png") },   // green diamond
+  { id: "CLUB",      kind: "low",  pay: { 3: 0.15, 4: 0.3,  5: 0.45, 6: 0.6 }, weight: 12, build: () => imgSym("club.png") },      // blue club
 ];
 
 // Pre-render each symbol's SVG once (they are static) and index by id.
-const REGISTRY = {};
-DEFS.forEach((d) => { REGISTRY[d.id] = Object.assign({}, d, { svgHTML: d.build() }); });
+const REGISTRY: Record<string, RegistryEntry> = {};
+DEFS.forEach((d) => { REGISTRY[d.id] = { ...d, svgHTML: d.build() }; });
 
 // Specials are rendered on demand (wild number / frame overlay vary).
-function buildWild(n) { return wild(n); }
-function buildFrameOverlay() { return frameOverlay(); }
+function buildWild(n: number): string { return wild(n); }
+function buildFrameOverlay(): string { return frameOverlay(); }
 
 // Shared SVG filter defs injected once into the document.
 const FILTER_DEFS = `
@@ -265,8 +267,8 @@ export const GTSymbols = {
   DEFS,
   REGISTRY,
   order: DEFS.map((d) => d.id),
-  paytableOrder: ['ZEUS', 'ATHENA', 'APHRODITE', 'HEART', 'SPADE', 'DIAMOND', 'CLUB'],
-  get: (id) => REGISTRY[id],
+  paytableOrder: ["ZEUS", "ATHENA", "APHRODITE", "HEART", "SPADE", "DIAMOND", "CLUB"] as SymbolId[],
+  get: (id: SymbolId): RegistryEntry => REGISTRY[id],
   buildWild,
   buildFrameOverlay,
   art: { torch, character, pillar, frameOverlay, techRune },
