@@ -1,14 +1,23 @@
 /* =============================================================================
-   Golden Temple — UI controller (render + animation + controls)
+   Aether Dynasty — UI controller (render + animation + controls)
+   ---------------------------------------------------------------------------
+   Ported from the original `main.js` IIFE. Instead of booting on
+   `DOMContentLoaded`, the work is exposed as `boot()`, which a client React
+   component calls from `useEffect` once the markup is mounted. `boot()` returns
+   a cleanup function that detaches the document-level key listeners (so Fast
+   Refresh / unmount don't stack duplicate handlers).
    ============================================================================= */
-(function () {
-  'use strict';
 
-  const S = window.GTSymbols;
-  const COLS = window.GTEngine.COLS;     // 6
-  const ROWS = window.GTEngine.MAX_ROWS; // 6
+import { GTSymbols } from './symbols';
+import { GTEngine } from './engine';
+import { GTRules } from './rules';
 
-  const engine = window.GTEngine.create({ balance: 50000, bet: 3 });
+export function boot() {
+  const S = GTSymbols;
+  const COLS = GTEngine.COLS;     // 6
+  const ROWS = GTEngine.MAX_ROWS; // 6
+
+  const engine = GTEngine.create({ balance: 50000, bet: 3 });
 
   // ---- DOM refs --------------------------------------------------------------
   const $ = (id) => document.getElementById(id);
@@ -26,6 +35,9 @@
   let winThisSpin = 0;
   let history = [];   // transaction log, newest first
 
+  // document-level listeners to detach on cleanup
+  const teardown = [];
+
   const speed = () => (skip ? 0.001 : (turbo === 2 ? 0.28 : turbo === 1 ? 0.5 : 1));
   const sleep = (ms) => new Promise((r) => setTimeout(r, Math.max(0, ms * speed())));
 
@@ -34,9 +46,9 @@
   const fmtInt = (n) => Math.round(n).toLocaleString('en-US');
 
   // =============================================================================
-  // Boot
+  // Boot (runs once the React markup is mounted)
   // =============================================================================
-  document.addEventListener('DOMContentLoaded', () => {
+  function init() {
     $('filter-defs').innerHTML = S.FILTER_DEFS;
 
     // decorative art
@@ -76,7 +88,7 @@
       engine.st.goldenTreasureUsed = false;
       setTimeout(() => { setSpinning(true); runFreeGames().then(() => setSpinning(false)); }, 250);
     }
-  });
+  }
 
   // =============================================================================
   // Board rendering
@@ -485,13 +497,16 @@
   // =============================================================================
   function wireControls() {
     btnSpin.addEventListener('click', handleSpinPress);
-    document.addEventListener('keydown', (e) => {
+
+    const onSpaceKey = (e) => {
       if (e.code !== 'Space') return;
       e.preventDefault();
       // don't spin behind an open modal
       if (!$('rulesModal').hidden || !$('autoModal').hidden || !$('historyModal').hidden) return;
       handleSpinPress();
-    });
+    };
+    document.addEventListener('keydown', onSpaceKey);
+    teardown.push(() => document.removeEventListener('keydown', onSpaceKey));
 
     $('betPlus').addEventListener('click', () => { if (spinning) return; engine.changeBet(1); betValEl.textContent = engine.bet; beep(520, 0.05, 'square', 0.04); });
     $('betMinus').addEventListener('click', () => { if (spinning) return; engine.changeBet(-1); betValEl.textContent = engine.bet; beep(420, 0.05, 'square', 0.04); });
@@ -512,10 +527,13 @@
     $('btnHistory').addEventListener('click', () => { renderHistory(); $('historyModal').hidden = false; });
     $('historyClose').addEventListener('click', () => { $('historyModal').hidden = true; });
     $('historyModal').addEventListener('click', (e) => { if (e.target === $('historyModal')) $('historyModal').hidden = true; });
+
     // Esc closes whichever modal is open
-    document.addEventListener('keydown', (e) => {
+    const onEscKey = (e) => {
       if (e.key === 'Escape') ['historyModal', 'rulesModal', 'autoModal'].forEach((id) => { if (!$(id).hidden) $(id).hidden = true; });
-    });
+    };
+    document.addEventListener('keydown', onEscKey);
+    teardown.push(() => document.removeEventListener('keydown', onEscKey));
 
     // rules modal
     $('btnRules').addEventListener('click', () => { $('rulesModal').hidden = false; });
@@ -577,7 +595,7 @@
   // =============================================================================
   function buildRules() {
     const tabsEl = $('rulesTabs'), bodyEl = $('rulesBody');
-    const pages = window.GTRules;
+    const pages = GTRules;
     tabsEl.innerHTML = '';
     pages.forEach((p, i) => {
       const b = document.createElement('button');
@@ -621,4 +639,11 @@
       grid.appendChild(card);
     });
   }
-})();
+
+  // Run the boot sequence now that every declaration above is initialised, then
+  // hand back a cleanup that detaches the document-level key listeners.
+  init();
+  return () => { teardown.forEach((fn) => fn()); };
+}
+
+export default boot;

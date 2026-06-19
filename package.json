@@ -1,0 +1,17 @@
+{
+  "name": "aether-dynasty",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aether Dynasty — 46,656 Ways slot, ported to Next.js (App Router).",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^16.2.9",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  }
+}

@@ -41,7 +41,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   container-name:stage;
   display:flex;flex-direction:column;
   background:
-    url('../assets/Winged_figures_near_energy_vortex_202606181051.gif') center/cover no-repeat #0a0510;
+    url('/assets/Winged_figures_near_energy_vortex_202606181051.gif') center/cover no-repeat #0a0510;
   overflow:hidden;
 }
 .screen::before{ /* stone floor — fades smoothly upward, no hard cutoff */
@@ -116,7 +116,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   background:radial-gradient(120% 150% at 38% 18%, #241b0d 0%, #100a05 50%, #050302 100%);
   border-color:#ffe7a0;}
 .info-ico{width:1.95em;height:1.95em;flex:none;display:block;
-  background:url("../assets/buttons/image 658.png") center/contain no-repeat;
+  background:url("/assets/buttons/image 658.png") center/contain no-repeat;
   filter:drop-shadow(0 1px 2px #000a);}
 .info-txt{white-space:nowrap;line-height:1;text-shadow:0 0 8px #43e8ff55, 0 1px 2px #000;}
 @keyframes infoPulse{0%,100%{box-shadow:0 0 14px #43e8ff99,0 0 0 3px #00000099,0 4px 14px #000a,inset 0 0 16px #00000099;}
@@ -131,8 +131,8 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 #btnSound,#btnHistory{background:center/contain no-repeat;border:none;font-size:0;
   width:clamp(34px,min(4.4cqw,6.4cqh),58px);height:clamp(34px,min(4.4cqw,6.4cqh),58px);
   filter:drop-shadow(0 2px 4px #0008);transition:transform .12s,filter .15s;}
-#btnSound{background-image:url("../assets/buttons/image 654.png");}
-#btnHistory{background-image:url("../assets/buttons/image 659.png");}
+#btnSound{background-image:url("/assets/buttons/image 654.png");}
+#btnHistory{background-image:url("/assets/buttons/image 659.png");}
 #btnSound:hover,#btnHistory:hover{background-color:transparent;box-shadow:none;transform:scale(1.07);
   filter:drop-shadow(0 0 8px #6cff8a99) drop-shadow(0 2px 4px #0008);}
 #btnSound.muted{opacity:.6;filter:grayscale(.85) brightness(.6);}
@@ -172,14 +172,14 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 
 .cell{
   position:relative;flex:1;border-radius:8px;overflow:hidden;
-  background:url("../assets/box-bg.png") center/cover no-repeat, #3b2e1f;
+  background:url("/assets/box-bg.png") center/cover no-repeat, #3b2e1f;
   box-shadow:inset 0 1px 0 #ffe9b033, inset 0 -3px 6px #00000066, 0 1px 2px #0008;
   display:grid;place-items:center;
 }
 .cell .sym{width:90%;height:90%;display:grid;place-items:center;position:relative;z-index:1;}
 .cell .sym svg{width:100%;height:100%;display:block;}
 /* empty boxes are covered by a caramel block */
-.cell.locked{background:url("../assets/block-normal.png") center/cover no-repeat, #241910;
+.cell.locked{background:url("/assets/block-normal.png") center/cover no-repeat, #241910;
   box-shadow:inset 0 0 14px #0009, inset 0 1px 0 #ffe9b022;}
 
 /* frame overlay sits above the wrapped symbol */
@@ -231,7 +231,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 /* a caramel (block-image) box being replaced: it breaks first (block-gif), THEN
    the symbol drops into the now-broken spot */
 .break-fx{position:absolute;inset:0;z-index:3;border-radius:8px;pointer-events:none;
-  background:url("../assets/block-gif.gif") center/cover no-repeat;
+  background:url("/assets/block-gif.gif") center/cover no-repeat;
   animation:blockBreak .62s ease forwards;}
 @keyframes blockBreak{0%{opacity:1;transform:scale(1);}
   48%{opacity:1;transform:scale(1.04);}
@@ -313,13 +313,13 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   font-weight:700;letter-spacing:1px;line-height:1;color:#ffe1a0;}
 .round-btn.turbo::before{content:"";
   width:clamp(22px,2.9cqw,38px);height:clamp(20px,2.6cqw,34px);
-  background:url("../assets/buttons/turbo.png") center/contain no-repeat;
+  background:url("/assets/buttons/turbo.png") center/contain no-repeat;
   filter:saturate(.7) brightness(.92);opacity:.82;transition:filter .2s,opacity .2s;}
 .round-btn.turbo.on{box-shadow:0 0 16px #ffd24a;border-color:#fff;background:radial-gradient(circle at 35% 30%,#7a5a20,#3a2600);}
 .round-btn.turbo.on::before{opacity:1;filter:drop-shadow(0 0 6px #ffd24a) drop-shadow(0 0 3px #43e8ff88);}
-.round-btn.turbo.super::before{background-image:url("../assets/buttons/super turbo.png");width:clamp(26px,3.4cqw,44px);}
+.round-btn.turbo.super::before{background-image:url("/assets/buttons/super turbo.png");width:clamp(26px,3.4cqw,44px);}
 /* AUTO uses the painted refresh button; live count shows over a disc while running */
-.round-btn.auto{background:url("../assets/buttons/image 655.png") center/contain no-repeat;
+.round-btn.auto{background:url("/assets/buttons/image 655.png") center/contain no-repeat;
   border:none;box-shadow:none;min-width:0;padding:0;border-radius:50%;
   width:clamp(44px,min(5.2cqw,7.6cqh),76px);height:clamp(44px,min(5.2cqw,7.6cqh),76px);}
 .round-btn.auto::before{display:none;}
@@ -336,9 +336,9 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   background:none;border:none;box-shadow:none;filter:drop-shadow(0 5px 12px #0009);}
 /* frame layer: idle (gold) by default, rotating (pink) while spinning, and it spins */
 .spin-frame{position:absolute;inset:0;border-radius:50%;
-  background:url("../assets/buttons/spin button idle.png") center/contain no-repeat;}
+  background:url("/assets/buttons/spin button idle.png") center/contain no-repeat;}
 .round-btn.spin.spinning .spin-frame,
-.round-btn.spin.autoact .spin-frame{background-image:url("../assets/buttons/spin button rotating.png");}
+.round-btn.spin.autoact .spin-frame{background-image:url("/assets/buttons/spin button rotating.png");}
 .round-btn.spin.spinning .spin-frame{animation:spinRotate .8s linear infinite;}
 @keyframes spinRotate{to{transform:rotate(360deg);}}
 .round-btn.spin:not(.spinning):not(.autoact) .spin-frame{animation:spinIdle 2.4s ease-in-out infinite;}
@@ -372,7 +372,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 #rulesModal .modal-card{width:min(880px,96vw);max-height:94vh;}   /* wider + taller so rules fit without scrolling on desktop */
 .modal-close{position:absolute;top:10px;right:12px;border:none;z-index:3;font-size:0;
   width:clamp(34px,3.4cqw,44px);height:clamp(34px,3.4cqw,44px);
-  background:url("../assets/buttons/image 653.png") center/contain no-repeat;
+  background:url("/assets/buttons/image 653.png") center/contain no-repeat;
   filter:drop-shadow(0 2px 4px #0009);transition:transform .12s,filter .15s;}
 .modal-close:hover{transform:scale(1.08);filter:drop-shadow(0 0 8px #ff6a5a99) drop-shadow(0 2px 4px #0009);}
 .rules-tabs{display:flex;gap:7px;padding:16px 16px 12px;border-bottom:1px solid #ffd86a22;

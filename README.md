@@ -3,9 +3,9 @@
 A from-scratch browser slot built to a classic expanding-ways spec, rebranded
 with a **futuristic-meets-historical** identity ("Neon Antiquity"): an ancient
 temple lit by torches, wrapped in a glowing holographic / stargate aesthetic.
-Pure HTML/CSS/JavaScript — **no external image assets**. Every symbol, the
-explorer character, torches, pillars, ornate frames and the rotating astrolabe
-rune-ring are generated as **dynamic SVG** at runtime.
+Built with **Next.js** (App Router). Board symbols are painted PNGs
+(`public/assets/match-assets/`); the torches, ornate frames and the rotating
+astrolabe rune-ring are still generated as **dynamic SVG** at runtime.
 
 ### Look & type system
 - **Fonts:** `Orbitron` (futuristic readouts — brand, ways counter, HUD numbers,
@@ -17,10 +17,19 @@ rune-ring are generated as **dynamic SVG** at runtime.
 
 ## Run it
 
-Just open `index.html` in any modern browser (no build step, no server needed):
+This is a [Next.js](https://nextjs.org) (App Router) app. Install once, then start
+the dev server:
 
 ```
-start index.html      # Windows
+npm install
+npm run dev        # http://localhost:3000
+```
+
+For a production build:
+
+```
+npm run build
+npm run start
 ```
 
 Controls: **Spin** (or Spacebar) · **Bet ±** · **Turbo** (tap = turbo, tap
@@ -48,12 +57,21 @@ again = super turbo) · **Auto** (pick a count) · **Sound** · **History** · t
 
 | File | Purpose |
 |------|---------|
-| `index.html` | Markup, HUD, modals, overlay |
-| `css/style.css` | Temple theme, layout, all animations |
-| `js/symbols.js` | Dynamic SVG library: gems, letters, wild, frame, torch, character, pillars + symbol registry & paytable |
-| `js/engine.js` | Pure game logic: ways evaluation, cascades, expansion, wilds, free game, payout cap |
-| `js/rules.js` | Rules/paytable content (mirrors the instruction screens) |
-| `js/main.js` | Rendering, spin/cascade animation, controls, sound, modals |
+| `src/app/layout.js` | Root layout: metadata, viewport, fonts, favicons |
+| `src/app/page.js` | Route that renders the game |
+| `src/app/globals.css` | Temple theme, layout, all animations |
+| `src/components/Game.js` | Client component: renders the markup (HUD, modals, overlay) once and boots the controller in `useEffect` |
+| `src/game/symbols.js` | Symbol library: painted-PNG board symbols, wild/frame overlays, decorative SVG (torch, rune-ring…) + registry & paytable |
+| `src/game/engine.js` | Pure game logic: ways evaluation, cascades, expansion, wilds, free game, payout cap |
+| `src/game/rules.js` | Rules/paytable content (mirrors the instruction screens) |
+| `src/game/controller.js` | Rendering, spin/cascade animation, controls, sound, modals (exports `boot()`) |
+| `public/assets/` | Painted PNGs, GIFs, button art, favicons (served from the site root) |
+
+The game logic is unchanged from the original vanilla build — the IIFE `window`
+globals were converted to ES modules, the markup became a React client
+component, and `main.js`'s `DOMContentLoaded` boot became `boot()`, called from
+`useEffect`. The component has no React state, so it renders once and the
+controller drives all updates imperatively (by element id) exactly as before.
 
 ## Notes
 

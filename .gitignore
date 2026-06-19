@@ -3,5 +3,15 @@ _shot_*.png
 _edge_err.txt
 *.log
 
-# node (only used for offline tests, never shipped)
+# node
 node_modules/
+
+# next.js
+/.next/
+/out/
+/build
+next-env.d.ts
+
+# env / deploy
+.env*.local
+.vercel
