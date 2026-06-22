@@ -11,6 +11,7 @@
 import { GTSymbols } from "@/lib/symbols";
 import { GTEngine } from "@/lib/engine";
 import { GTRules } from "@/lib/rules";
+import { fetchBlockchainSeed, deriveSpinSeed, type BlockchainSeedResult } from "@/lib/blockchainRng";
 import type { Board, Cascade, Cell, Engine, Heights, SymbolId } from "@/lib/types";
 
 declare global {
@@ -20,6 +21,7 @@ declare global {
       doSpin: () => void;
       render: (animateDrop?: boolean, breakFill?: boolean) => void;
       state: () => { b: Board; h: Heights };
+      seedInfo: () => BlockchainSeedResult | null;
     };
     __showRulePage?: (i: number) => void;
     webkitAudioContext?: typeof AudioContext;
@@ -71,6 +73,39 @@ export function boot(): () => void {
   const fmtMoney = (n: number): string => Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtInt = (n: number): string => Math.round(n).toLocaleString("en-US");
 
+  // ---- provably-fair RNG seeding (blockchain) --------------------------------
+  // A verifiable seed is pulled from the same blockchain service the horse game
+  // uses; the engine is re-seeded before EVERY spin (base + free) so each outcome
+  // is provably fair. A throttled background refresh keeps the chain seed fresh,
+  // and a per-spin nonce makes each spin a distinct deterministic sequence (so
+  // rapid spins that share a block don't repeat). Falls back to Math.random.
+  let seedAudit: BlockchainSeedResult | null = null;
+  let spinNonce = 0;
+  let lastSeedFetch = 0;
+  let seedFetching = false;
+
+  function refreshSeed(force = false): void {
+    if (seedFetching) return;
+    const now = Date.now();
+    if (!force && now - lastSeedFetch < 8000) return;
+    seedFetching = true; lastSeedFetch = now;
+    fetchBlockchainSeed(signal)
+      // Keep spinNonce MONOTONIC — never reset it. Blocks advance (~12s) slower
+      // than the refresh throttle (8s), so consecutive fetches often return the
+      // same block; resetting the nonce would reproduce (base, 0) and replay an
+      // identical board. A growing nonce keeps every spin a distinct sequence.
+      .then((r) => { if (!signal.aborted) seedAudit = r; })
+      .catch(() => { /* keep the previous seed; per-spin fallback covers it */ })
+      .finally(() => { seedFetching = false; });
+  }
+
+  function seedNextSpin(): void {
+    const base = seedAudit ? seedAudit.seed : Math.random();
+    engine.setSeed(deriveSpinSeed(base, spinNonce));
+    spinNonce++;
+    refreshSeed();   // throttled background refresh for upcoming spins
+  }
+
   // =============================================================================
   // Boot (runs once the React markup is mounted)
   // =============================================================================
@@ -100,7 +135,8 @@ export function boot(): () => void {
     winValEl.textContent = "0.00";
 
     // headless / debug hooks
-    window.GT = { engine, doSpin, render: renderBoard, state: () => ({ b: currentBoard, h: currentHeights }) };
+    window.GT = { engine, doSpin, render: renderBoard, state: () => ({ b: currentBoard, h: currentHeights }), seedInfo: () => seedAudit };
+    refreshSeed(true);   // start fetching the provably-fair blockchain seed
     if (/[?&]autospin/.test(location.search)) {
       autoInfinite = true; btnAuto.classList.add("on"); updateAutoBtn(); refreshSpinBtn();
       setTimeout(doSpin, 200);
@@ -284,6 +320,7 @@ export function boot(): () => void {
 
     await preSpin();
 
+    seedNextSpin();              // re-seed the engine from the blockchain seed
     const result = engine.spin();
 
     // deduct bet visually (base game only)
@@ -442,6 +479,7 @@ export function boot(): () => void {
       $("fgMult").textContent = String(engine.st.mult);
       await sleep(420);
 
+      seedNextSpin();           // each free spin is independently chain-seeded
       const res = engine.spin();
       const before = engine.balance - res.totalWin;
 

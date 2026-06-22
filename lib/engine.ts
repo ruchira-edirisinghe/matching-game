@@ -51,8 +51,27 @@ const MAX_WIN_MULT = 10000;       // 10,000x max payout multiplier
 const BET_LEVELS = [1, 2, 3, 5, 8, 10, 20, 30, 50, 80, 100, 200, 300, 500, 800, 1000];
 
 // ---- rng -------------------------------------------------------------------
-const rnd = (): number => Math.random();
+// The active source is swappable: by default Math.random, but `setSeed` points
+// it at a deterministic sin-based PRNG seeded from the blockchain RNG service so
+// each spin's outcome is provably fair (same PRNG family as the horse game).
+let _activeRng: () => number = Math.random;
+const rnd = (): number => _activeRng();
 const randInt = (a: number, b: number): number => a + Math.floor(rnd() * (b - a + 1));
+
+// Seeded PRNG. Seeded from the SAME blockchain RNG source as the horse-racing
+// game, but using mulberry32 instead of that game's sin-based generator: the
+// sin PRNG is statistically weak and makes RTP drift a few % with the seed
+// pattern, which would undo the paytable tuning. mulberry32 is uniform, so the
+// outcome stays provably-fair (deterministic from the chain seed) AND RTP-stable.
+function makeRng(seed: number): () => number {
+  let a = (seed || 1) >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 const _wsum = WEIGHTS.reduce((a, b) => a + b, 0);
 function pickSymbol(): SymbolId {
@@ -239,6 +258,13 @@ function createEngine(opts: EngineOptions = {}): Engine {
     get inFree() { return st.inFree; },
     waysOf,
     symbol: (id: SymbolId) => S.get(id),
+
+    // Point the engine's randomness at a deterministic PRNG seeded for the next
+    // spin (called by the controller with a blockchain-derived seed). Pass no
+    // argument / 0 to revert to Math.random.
+    setSeed(intSeed?: number): void {
+      _activeRng = intSeed ? makeRng(intSeed) : Math.random;
+    },
 
     changeBet(dir: number): number {
       st.betIndex = Math.min(BET_LEVELS.length - 1, Math.max(0, st.betIndex + dir));

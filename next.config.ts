@@ -10,6 +10,17 @@ const nextConfig: NextConfig = {
   // Pin the workspace root to this project. A stray lockfile in the home dir
   // otherwise makes Next guess the wrong root for Turbopack.
   turbopack: { root: process.cwd() },
+
+  // Proxy the provably-fair blockchain RNG service server-side so the browser
+  // isn't blocked by CORS (same service the horse-racing game uses).
+  async rewrites() {
+    return [
+      {
+        source: "/api/blockchain/:path*",
+        destination: "https://blockchainrandom.azurewebsites.net/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

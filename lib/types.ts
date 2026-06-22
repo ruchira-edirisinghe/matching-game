@@ -125,6 +125,7 @@ export interface Engine {
   symbol: (id: SymbolId) => RegistryEntry;
   changeBet: (dir: number) => number;
   setBetIndex: (i: number) => number;
+  setSeed: (intSeed?: number) => void;
   canSpin: () => boolean;
   spin: () => SpinResult;
   idleBoard: () => { board: Board; heights: Heights };

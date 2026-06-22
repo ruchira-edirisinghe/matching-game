@@ -77,8 +77,8 @@ const PAGES: RulePage[] = [
     tab: "Paytable",
     title: "Paytable",
     html: `
-      <p class="rule-note">Payouts are shown at <b>bet = 3</b>. This game uses a dynamic paytable; displayed pays reflect
-         the amount for achieving the combination at the selected bet level.</p>
+      <p class="rule-note">Pays shown are <b>per way</b> at <b>bet = 3</b>. Your actual win scales with your bet and the
+         number of ways the symbol lands on adjacent reels.</p>
       <div class="paytable-grid" id="paytableGrid"></div>`,
   },
   {
