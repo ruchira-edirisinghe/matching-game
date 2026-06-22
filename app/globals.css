@@ -75,6 +75,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   filter:drop-shadow(0 0 16px var(--neon-dim));}
 .rune-ring svg{width:100%;height:100%;display:block;}
 .rune-ring .rr-outer{transform-box:fill-box;transform-origin:center;animation:rrspin 120s linear infinite;}
+.rune-ring .rr-mid{transform-box:fill-box;transform-origin:center;animation:rrspin 95s linear infinite;}
 .rune-ring .rr-inner{transform-box:fill-box;transform-origin:center;animation:rrspin 70s linear infinite reverse;}
 @keyframes rrspin{to{transform:rotate(360deg);}}
 
@@ -367,28 +368,38 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 @keyframes hintPulse{0%,100%{opacity:.78;}50%{opacity:1;}}
 
 /* ---- modals --------------------------------------------------------------- */
-.modal{position:fixed;inset:0;z-index:50;display:grid;place-items:center;
+/* Height is pinned to the dynamic viewport (dvh) so on mobile the card never
+   extends behind the browser's address bar — the card always fits the visible
+   area and its body scrolls internally. */
+.modal{position:fixed;top:0;left:0;width:100%;height:100vh;height:100dvh;
+  z-index:50;display:grid;place-items:center;justify-content:center;
   background:#000b;backdrop-filter:blur(3px);padding:16px;animation:fade .2s ease;}
 @keyframes fade{from{opacity:0;}to{opacity:1;}}
-.modal-card{position:relative;width:min(760px,96vw);max-height:90vh;overflow:hidden;display:flex;flex-direction:column;
+/* max-height:100% = the modal's padded content box (i.e. visible viewport minus
+   padding), so the card fits in every orientation without being clipped. */
+.modal-card{position:relative;width:min(760px,96vw);max-height:100%;overflow:hidden;display:flex;flex-direction:column;
   background:linear-gradient(#161020,#0a0710);border:2px solid #b9821f;border-radius:16px;
   box-shadow:0 0 50px #000, 0 0 0 4px #4a2f1066, 0 0 40px #43e8ff33, inset 0 0 40px #43e8ff0d;}
 .small-card{width:min(420px,96vw);}
-#rulesModal .modal-card{width:min(880px,96vw);max-height:94vh;}   /* wider + taller so rules fit without scrolling on desktop */
+#rulesModal .modal-card{width:min(880px,96vw);}   /* wider so the rules fit in columns on desktop */
 .modal-close{position:absolute;top:10px;right:12px;border:none;z-index:3;font-size:0;
   width:clamp(34px,3.4cqw,44px);height:clamp(34px,3.4cqw,44px);
   background:url("/assets/buttons/close.png") center/contain no-repeat;
   filter:drop-shadow(0 2px 4px #0009);transition:transform .12s,filter .15s;}
 .modal-close:hover{transform:scale(1.08);filter:drop-shadow(0 0 8px #ff6a5a99) drop-shadow(0 2px 4px #0009);}
-.rules-tabs{display:flex;gap:7px;padding:16px 16px 12px;border-bottom:1px solid #ffd86a22;
-  overflow-x:auto;scrollbar-width:thin;}
+/* margin-right keeps the scrolling tab strip clear of the absolute close button
+   so a tab can never sit under the X (tap-target conflict on mobile). */
+.rules-tabs{display:flex;gap:7px;padding:16px 16px 12px;margin-right:clamp(52px,9vw,64px);
+  border-bottom:1px solid #ffd86a22;overflow-x:auto;scrollbar-width:thin;}
 .rules-tabs button{flex:0 0 auto;background:#241528;border:1px solid #ffd86a44;color:#e9d3a6;border-radius:999px;
   padding:8px 16px;font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.5px;
   white-space:nowrap;transition:.15s;}
 .rules-tabs button:hover{border-color:#ffd86a;color:#fff3d0;}
 .rules-tabs button.active{background:linear-gradient(#ffe9a0,#f3b42a 55%,#a4600f);color:#2a1500;
   border-color:#fff3c0;box-shadow:0 0 12px #ffb13a77;}
-.rules-body{padding:14px 22px 18px;overflow:auto;}
+/* flex:1 + min-height:0 lets the body shrink within the flex card so overflow
+   actually scrolls instead of being clipped by the card's max-height. */
+.rules-body{padding:14px 22px 18px;overflow:auto;flex:1 1 auto;min-height:0;-webkit-overflow-scrolling:touch;}
 .rules-body h2{font-family:var(--font-fx);color:var(--orange);text-align:center;text-transform:uppercase;
   font-size:clamp(20px,3.2vw,28px);letter-spacing:2px;margin:.1em 0 .5em;
   text-shadow:0 0 12px #43e8ff66, 0 0 6px #ff8a1e55;}
@@ -513,11 +524,14 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
      short phones — tall phones stay width-bound at 92cqw and are unaffected). */
   .board{--board-size:clamp(130px,min(42cqh,92cqw),600px);}
 
-  /* top bar: smaller logo, kept clear of the help pill so they never overlap */
+  /* top bar: compact logo + a vertical help pill (question logo above the
+     "HOW TO PLAY" caption), kept clear of the logo so they never overlap */
   .topbar{padding:max(6px,1.6vmin) 3vw 0;}
-  .logo img{height:clamp(44px,min(10cqh,18vmin),112px);max-width:58vw;}
-  .icon-btn.info-btn{right:3vw;gap:.4em;padding:6px 11px;font-size:11px;letter-spacing:1px;}
-  .info-ico{width:1.5em;height:1.5em;}
+  .logo img{height:clamp(44px,min(10cqh,18vmin),104px);max-width:48vw;}
+  .icon-btn.info-btn{right:2.5vw;flex-direction:column;gap:3px;
+    padding:6px 8px;font-size:9px;letter-spacing:.4px;line-height:1.08;}
+  .info-ico{width:clamp(19px,5vmin,26px);height:clamp(19px,5vmin,26px);}
+  .info-txt{white-space:normal;text-align:center;max-width:5.5em;}
 
   /* free-game banner shrinks so it can't overflow a narrow screen */
   .free-banner{gap:2.5vw;padding:5px 3vw;font-size:clamp(11px,3vmin,15px);}
@@ -525,48 +539,58 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 
   /* HUD re-flows into three rows:
        row 1  [ balance ][ win ]
-       row 2  [ bet -/+ ][ sound / history ]
-       row 3  [   turbo   auto   SPIN   ]                                    */
+       row 2  [ −  Bet Rs 3  + ]                       (full width, single line)
+       row 3  [ turbo  auto ][ SPIN ][ sound  history ]   (SPIN dead-centre)   */
   .hud{
-    display:grid;width:100%;gap:1.4vmin 2.5vw;
-    grid-template-columns:1fr 1fr;
+    display:grid;width:100%;gap:1.4vmin 2vw;
+    grid-template-columns:repeat(6,1fr);
     grid-template-areas:
-      "balance win"
-      "bet     util"
-      "controls controls";
+      "balance balance balance win    win    win"
+      "bet     bet     bet     bet    bet    bet"
+      "turbo   auto    spin    spin   snd    hist";
     margin:0 auto clamp(6px,1.4vmin,16px);padding:0 3vw;
   }
   .meter.balance{grid-area:balance;}
   .meter.win{grid-area:win;}
-  .bet-block{grid-area:bet;justify-self:stretch;}
-  .util{grid-area:util;flex-direction:row;justify-self:end;align-items:center;gap:clamp(8px,3vw,18px);}
-  .controls{grid-area:controls;justify-content:center;gap:clamp(12px,6vw,30px);}
+  /* the control wrappers collapse so their buttons land directly on the grid,
+     letting SPIN sit centred with turbo/auto on its left and sound/history
+     (music + transactions) on its right */
+  .controls,.util{display:contents;}
+  #btnTurbo{grid-area:turbo;justify-self:center;}
+  #btnAuto{grid-area:auto;justify-self:center;}
+  #btnSpin{grid-area:spin;justify-self:center;}
+  #btnSound{grid-area:snd;justify-self:center;}
+  #btnHistory{grid-area:hist;justify-self:center;}
 
-  /* legible, tappable sizing (cqw is tiny on a narrow viewport) */
-  .meter,.bet-block{min-height:clamp(46px,13vmin,64px);padding:clamp(6px,1.4vmin,12px) 3vw;width:100%;}
-  .meter{min-width:0;}
-  .meter-top{font-size:clamp(10px,3vmin,14px);}
-  .meter-val{font-size:clamp(14px,4.6vmin,22px);}
-  .bet-block{gap:clamp(8px,3vw,16px);justify-content:space-between;}
-  .bet-info{min-width:0;}
+  /* bet block: full-width row with the amount on one line (− [Bet Rs 3] +),
+     which is shorter than the old stacked label/value */
+  .bet-block{grid-area:bet;flex-direction:row;justify-content:center;width:100%;
+    gap:clamp(10px,4vw,26px);min-height:clamp(34px,9vmin,46px);padding:clamp(3px,0.8vmin,6px) 3vw;}
+  .bet-info{min-width:0;display:flex;flex-direction:row;align-items:baseline;gap:2vw;}
   .bet-label{font-size:clamp(10px,3vmin,14px);}
   .bet-val{font-size:clamp(15px,5vmin,24px);}
-  .round-btn.small{width:12vmin;height:12vmin;max-width:48px;max-height:48px;font-size:clamp(18px,6vmin,24px);}
 
-  .round-btn.turbo,.round-btn.auto{height:15vmin;max-height:62px;}
-  .round-btn.turbo{min-width:16vmin;}
-  .round-btn.turbo::before{width:8vmin;height:7vmin;max-width:34px;max-height:30px;}
-  .round-btn.turbo .btn-text{font-size:clamp(8px,2.4vmin,11px);}
-  .round-btn.auto{width:15vmin;height:15vmin;max-width:62px;max-height:62px;min-width:0;}
-  .round-btn.spin{width:20vmin;height:20vmin;max-width:96px;max-height:96px;}
+  /* meters (stay stacked: label over value) */
+  .meter{min-width:0;width:100%;min-height:clamp(46px,13vmin,64px);padding:clamp(6px,1.4vmin,12px) 3vw;}
+  .meter-top{font-size:clamp(10px,3vmin,14px);}
+  .meter-val{font-size:clamp(14px,4.6vmin,22px);}
+
+  /* tappable control sizing; five buttons share one row so turbo/auto are a
+     touch smaller than before */
+  .round-btn.small{width:10vmin;height:10vmin;max-width:42px;max-height:42px;font-size:clamp(17px,5vmin,21px);}
+  .round-btn.turbo,.round-btn.auto{height:13vmin;max-height:54px;}
+  .round-btn.turbo{min-width:13vmin;max-width:58px;}
+  .round-btn.turbo::before{width:7vmin;height:6vmin;max-width:30px;max-height:26px;}
+  .round-btn.turbo .btn-text{font-size:clamp(7px,2.2vmin,10px);}
+  .round-btn.auto{width:13vmin;height:13vmin;max-width:54px;max-height:54px;min-width:0;}
+  .round-btn.spin{width:20vmin;height:20vmin;max-width:92px;max-height:92px;}
   .spin-stop{font-size:clamp(18px,6vmin,30px);}
-
-  #btnSound,#btnHistory{width:12vmin;height:12vmin;max-width:50px;max-height:50px;}
+  #btnSound,#btnHistory{width:12vmin;height:12vmin;max-width:48px;max-height:48px;}
 
   /* readouts above the board */
   .ways-num{font-size:clamp(20px,6vmin,38px);}
   .ways-label{font-size:clamp(10px,3vmin,16px);}
-  .turbo-hint{font-size:clamp(9px,2.6vmin,13px);}
+  .turbo-hint{display:none;}   /* hide "press turbo spin" on mobile */
 }
 
 /* ===== SHORT LANDSCAPE (phones rotated — limited height) ================== */

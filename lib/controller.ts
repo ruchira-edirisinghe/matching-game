@@ -214,6 +214,9 @@ export function boot(): () => void {
     if (!soundOn) return;
     try {
       actx = actx || new (window.AudioContext || window.webkitAudioContext!)();
+      // Browsers start the context suspended until a user gesture; resume it so
+      // sounds aren't silently dropped (e.g. on the ?autospin auto-start path).
+      if (actx.state === "suspended") actx.resume().catch(() => { /* ignore */ });
       const o = actx.createOscillator(), g = actx.createGain();
       o.type = type || "triangle"; o.frequency.value = freq;
       g.gain.value = vol || 0.05;
@@ -297,7 +300,9 @@ export function boot(): () => void {
       await playCascade(result.cascades[i], i);
       runWin += result.cascades[i].totalWin;
       setWin(runWin);
-      await animateBalanceTo((result.freeMode ? prevBal : prevBal - engine.bet) + runWin);
+      // Clamp to the engine's final balance so the counter can't overshoot when
+      // the payout cap clamps the credited total (no-op when the cap isn't hit).
+      await animateBalanceTo(Math.min((result.freeMode ? prevBal : prevBal - engine.bet) + runWin, engine.balance));
     }
 
     // reconcile balance exactly with the engine
@@ -447,7 +452,7 @@ export function boot(): () => void {
         await playCascade(casc, i);
         runWin += casc.totalWin;
         setWin(runWin);
-        await animateBalanceTo(before + runWin);
+        await animateBalanceTo(Math.min(before + runWin, engine.balance));
       }
       freeTotalWin += runWin;
       $("fgLeft").textContent = String(res.freeLeft);
@@ -570,6 +575,10 @@ export function boot(): () => void {
     $("autoCancel").addEventListener("click", () => { $("autoModal").hidden = true; });
     $("autoStart").addEventListener("click", () => {
       $("autoModal").hidden = true;
+      // Don't commit to auto-spin if the player can't afford a spin — otherwise
+      // the AUTO/SPIN buttons get stuck in the "auto active" state with nothing
+      // running (doSpin would bail on the insufficient-balance check).
+      if (!engine.canSpin()) { flashInsufficient(); return; }
       if (autoSelected === "inf") { autoInfinite = true; autoRemaining = 0; }
       else { autoInfinite = false; autoRemaining = autoSelected; }
       btnAuto.classList.add("on");
@@ -668,7 +677,14 @@ export function boot(): () => void {
   // Run the boot sequence now that every declaration above is initialised, then
   // hand back a cleanup that detaches the document-level key listeners.
   init();
-  return () => { teardown.forEach((fn) => fn()); };
+  return () => {
+    teardown.forEach((fn) => fn());
+    // Release the audio context and drop the global debug hooks so a remount
+    // (Fast Refresh) doesn't leave stale closures pointing at detached DOM.
+    if (actx) { actx.close().catch(() => { /* ignore */ }); actx = null; }
+    delete window.GT;
+    delete window.__showRulePage;
+  };
 }
 
 export default boot;

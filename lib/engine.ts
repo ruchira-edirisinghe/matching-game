@@ -315,7 +315,7 @@ function createEngine(opts: EngineOptions = {}): Engine {
       if (freeMode && maxReached && !st.goldenTreasureUsed) {
         st.goldenTreasureUsed = true;
         goldenTreasure = true;
-        const choice = IDS[randInt(0, 4)]; // one of the gem symbols
+        const choice = IDS[randInt(0, IDS.length - 1)]; // any board symbol (rules: "randomly selects a symbol")
         const fullH = new Array<number>(COLS).fill(MAX_ROWS);
         const gboard: Board = [];
         for (let c = 0; c < COLS; c++) { const col: Cell[] = []; for (let r = 0; r < MAX_ROWS; r++) col.push({ id: choice, wild: false, frame: false, wildN: 0, fresh: true }); gboard.push(col); }
