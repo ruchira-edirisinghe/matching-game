@@ -167,8 +167,13 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   box-shadow:inset 0 0 18px #43e8ff44, inset 0 0 6px #ffb13a55, 0 0 8px #43e8ff33;
 }
 .board, .cascade-fx{position:relative;z-index:2;}
-.board{display:flex;gap:5px;height:clamp(160px,50cqh,600px);}
-.reel{display:flex;flex-direction:column;gap:5px;width:calc((clamp(160px,50cqh,600px) - 25px)/6);}
+/* The board is a square 6×6 grid: its width derives from its height (each reel
+   is 1/6 of the height). Sizing it as min(height-share, width-share) keeps the
+   whole grid inside the viewport in BOTH orientations — on a narrow portrait
+   screen the width share wins, so it can no longer overflow horizontally. */
+.board{--board-size:clamp(140px,min(50cqh,92cqw),600px);
+  display:flex;gap:5px;height:var(--board-size);}
+.reel{display:flex;flex-direction:column;gap:5px;width:calc((var(--board-size) - 25px)/6);}
 
 .cell{
   position:relative;flex:1;border-radius:8px;overflow:hidden;
@@ -493,6 +498,84 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   animation:coinFall linear forwards;}
 @keyframes coinFall{to{transform:translateY(110vh) rotate(540deg);opacity:.4;}}
 
-/* ---- responsive ----------------------------------------------------------- */
-/* The stage fills the viewport and scales its interior via container units
-   (cqw/cqh), so it stays proportional on its own without media queries. */
+/* ---- responsive ----------------------------------------------------------- *
+   On landscape/desktop the stage scales its interior with container units
+   (cqw/cqh) and the HUD sits in one row. On a narrow portrait screen those
+   width-based units collapse to their clamp minimums and the single HUD row no
+   longer fits, so the queries below re-flow the layout and switch the HUD's
+   interior sizing to vmin (which tracks the short edge — the width — in
+   portrait, giving legible, tappable controls). */
+
+/* ===== PORTRAIT / NARROW (phones & tablets held upright) ================== */
+@media (max-aspect-ratio: 1/1){
+  /* Cap the board near the upper half so the top bar, ways readout and the
+     3-row HUD always fit the remaining height (this cqh cap only bites on
+     short phones — tall phones stay width-bound at 92cqw and are unaffected). */
+  .board{--board-size:clamp(130px,min(42cqh,92cqw),600px);}
+
+  /* top bar: smaller logo, kept clear of the help pill so they never overlap */
+  .topbar{padding:max(6px,1.6vmin) 3vw 0;}
+  .logo img{height:clamp(44px,min(10cqh,18vmin),112px);max-width:58vw;}
+  .icon-btn.info-btn{right:3vw;gap:.4em;padding:6px 11px;font-size:11px;letter-spacing:1px;}
+  .info-ico{width:1.5em;height:1.5em;}
+
+  /* free-game banner shrinks so it can't overflow a narrow screen */
+  .free-banner{gap:2.5vw;padding:5px 3vw;font-size:clamp(11px,3vmin,15px);}
+  .free-banner span{letter-spacing:1px;}
+
+  /* HUD re-flows into three rows:
+       row 1  [ balance ][ win ]
+       row 2  [ bet -/+ ][ sound / history ]
+       row 3  [   turbo   auto   SPIN   ]                                    */
+  .hud{
+    display:grid;width:100%;gap:1.4vmin 2.5vw;
+    grid-template-columns:1fr 1fr;
+    grid-template-areas:
+      "balance win"
+      "bet     util"
+      "controls controls";
+    margin:0 auto clamp(6px,1.4vmin,16px);padding:0 3vw;
+  }
+  .meter.balance{grid-area:balance;}
+  .meter.win{grid-area:win;}
+  .bet-block{grid-area:bet;justify-self:stretch;}
+  .util{grid-area:util;flex-direction:row;justify-self:end;align-items:center;gap:clamp(8px,3vw,18px);}
+  .controls{grid-area:controls;justify-content:center;gap:clamp(12px,6vw,30px);}
+
+  /* legible, tappable sizing (cqw is tiny on a narrow viewport) */
+  .meter,.bet-block{min-height:clamp(46px,13vmin,64px);padding:clamp(6px,1.4vmin,12px) 3vw;width:100%;}
+  .meter{min-width:0;}
+  .meter-top{font-size:clamp(10px,3vmin,14px);}
+  .meter-val{font-size:clamp(14px,4.6vmin,22px);}
+  .bet-block{gap:clamp(8px,3vw,16px);justify-content:space-between;}
+  .bet-info{min-width:0;}
+  .bet-label{font-size:clamp(10px,3vmin,14px);}
+  .bet-val{font-size:clamp(15px,5vmin,24px);}
+  .round-btn.small{width:12vmin;height:12vmin;max-width:48px;max-height:48px;font-size:clamp(18px,6vmin,24px);}
+
+  .round-btn.turbo,.round-btn.auto{height:15vmin;max-height:62px;}
+  .round-btn.turbo{min-width:16vmin;}
+  .round-btn.turbo::before{width:8vmin;height:7vmin;max-width:34px;max-height:30px;}
+  .round-btn.turbo .btn-text{font-size:clamp(8px,2.4vmin,11px);}
+  .round-btn.auto{width:15vmin;height:15vmin;max-width:62px;max-height:62px;min-width:0;}
+  .round-btn.spin{width:20vmin;height:20vmin;max-width:96px;max-height:96px;}
+  .spin-stop{font-size:clamp(18px,6vmin,30px);}
+
+  #btnSound,#btnHistory{width:12vmin;height:12vmin;max-width:50px;max-height:50px;}
+
+  /* readouts above the board */
+  .ways-num{font-size:clamp(20px,6vmin,38px);}
+  .ways-label{font-size:clamp(10px,3vmin,16px);}
+  .turbo-hint{font-size:clamp(9px,2.6vmin,13px);}
+}
+
+/* ===== SHORT LANDSCAPE (phones rotated — limited height) ================== */
+@media (orientation:landscape) and (max-height:520px){
+  .topbar{padding:1vmin 2cqw 0;}
+  .logo img{height:clamp(38px,11cqh,90px);}
+  .icon-btn.info-btn{padding:5px 10px;font-size:11px;}
+  /* give back vertical room: smaller board + tighter HUD, drop the hint line */
+  .board{--board-size:clamp(120px,min(44cqh,70cqw),520px);}
+  .hud{margin-bottom:clamp(6px,1.6cqh,18px);gap:1.4cqw;}
+  .turbo-hint{display:none;}
+}
