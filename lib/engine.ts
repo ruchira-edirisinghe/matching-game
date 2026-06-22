@@ -44,7 +44,7 @@ const FRAME_COLS = [1, 2, 3, 4];  // golden frame only on reels 2..5 (0-indexed)
 
 const MAX_MULT = 3;               // free-game multiplier ceiling
 const FREE_CAP = 24;              // hard ceiling on total free games in a session
-const EXTRA_FREE_CHANCE = 0.28;   // chance a frame→wild during free awards +1 game
+const EXTRA_FREE_CHANCE = 0.08;   // chance a frame→wild during free awards +1 game
 const ABS_MAX_PAYOUT = 10000000;  // Rs 10,000,000
 const MAX_WIN_MULT = 10000;       // 10,000x max payout multiplier
 
@@ -162,7 +162,7 @@ function applyCascade(board: Board, heights: Heights, winSet: Set<string>, freeM
         const cell = board[nc][nr];
         if (!cell || cell.wild || cell.frame) continue;       // don't blast wilds/frames
         if (removedSet.has(nk) || winSet.has(nk)) continue;
-        if (rnd() < 0.45) { removedSet.add(nk); blast.push([nc, nr]); }   // partial blast
+        if (rnd() < 0.10) { removedSet.add(nk); blast.push([nc, nr]); }   // partial blast
       }
     });
   }
@@ -319,7 +319,7 @@ function createEngine(opts: EngineOptions = {}): Engine {
         const fullH = new Array<number>(COLS).fill(MAX_ROWS);
         const gboard: Board = [];
         for (let c = 0; c < COLS; c++) { const col: Cell[] = []; for (let r = 0; r < MAX_ROWS; r++) col.push({ id: choice, wild: false, frame: false, wildN: 0, fresh: true }); gboard.push(col); }
-        const prize = bet * spinMult * randInt(15, 40);
+        const prize = bet * spinMult * randInt(3, 8);
         cascades.push({
           wins: [{ symbol: choice, count: 6, ways: MAX_WAYS, amount: prize, cells: [] }],
           totalWin: prize,

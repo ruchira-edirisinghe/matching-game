@@ -235,14 +235,17 @@ function techRune(): string {
    Three Greek gods are the premium (high) symbols; the four card suits are
    the lower-paying symbols. Pays descend from Zeus down to the Club.
    --------------------------------------------------------------------------- */
+// Pays are PER WAY (multiplied by the number of ways the symbol lands), so they
+// are intentionally small — a fixed-line-sized paytable here multiplies up into a
+// runaway RTP. These values are tuned (with the free-game knobs) for ~95% RTP.
 const DEFS: SymbolDef[] = [
-  { id: "ZEUS",      kind: "high", pay: { 3: 0.9,  4: 1.5,  5: 2.0,  6: 3.0 }, weight: 5,  build: () => imgSym("zeus.png") },      // Zeus
-  { id: "ATHENA",    kind: "high", pay: { 3: 0.6,  4: 0.9,  5: 1.4,  6: 2.0 }, weight: 6,  build: () => imgSym("athena.png") },    // Athena
-  { id: "APHRODITE", kind: "high", pay: { 3: 0.45, 4: 0.75, 5: 1.05, 6: 1.5 }, weight: 7,  build: () => imgSym("aphrodite.png") }, // Aphrodite
-  { id: "HEART",     kind: "low",  pay: { 3: 0.3,  4: 0.6,  5: 0.9,  6: 1.2 }, weight: 9,  build: () => imgSym("heart.png") },     // red heart
-  { id: "SPADE",     kind: "low",  pay: { 3: 0.25, 4: 0.45, 5: 0.7,  6: 1.0 }, weight: 10, build: () => imgSym("spade.png") },     // purple spade
-  { id: "DIAMOND",   kind: "low",  pay: { 3: 0.2,  4: 0.4,  5: 0.6,  6: 0.9 }, weight: 11, build: () => imgSym("diamond.png") },   // green diamond
-  { id: "CLUB",      kind: "low",  pay: { 3: 0.15, 4: 0.3,  5: 0.45, 6: 0.6 }, weight: 12, build: () => imgSym("club.png") },      // blue club
+  { id: "ZEUS",      kind: "high", pay: { 3: 0.15, 4: 0.25, 5: 0.35, 6: 0.50 }, weight: 5,  build: () => imgSym("zeus.png") },      // Zeus
+  { id: "ATHENA",    kind: "high", pay: { 3: 0.10, 4: 0.15, 5: 0.22, 6: 0.32 }, weight: 6,  build: () => imgSym("athena.png") },    // Athena
+  { id: "APHRODITE", kind: "high", pay: { 3: 0.07, 4: 0.12, 5: 0.17, 6: 0.24 }, weight: 7,  build: () => imgSym("aphrodite.png") }, // Aphrodite
+  { id: "HEART",     kind: "low",  pay: { 3: 0.05, 4: 0.09, 5: 0.14, 6: 0.20 }, weight: 9,  build: () => imgSym("heart.png") },     // red heart
+  { id: "SPADE",     kind: "low",  pay: { 3: 0.04, 4: 0.07, 5: 0.11, 6: 0.16 }, weight: 10, build: () => imgSym("spade.png") },     // purple spade
+  { id: "DIAMOND",   kind: "low",  pay: { 3: 0.03, 4: 0.06, 5: 0.09, 6: 0.13 }, weight: 11, build: () => imgSym("diamond.png") },   // green diamond
+  { id: "CLUB",      kind: "low",  pay: { 3: 0.02, 4: 0.04, 5: 0.07, 6: 0.10 }, weight: 12, build: () => imgSym("club.png") },      // blue club
 ];
 
 // Pre-render each symbol's SVG once (they are static) and index by id.

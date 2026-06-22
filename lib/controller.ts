@@ -58,8 +58,11 @@ export function boot(): () => void {
   let shownBalance = engine.balance;
   const history: HistoryEntry[] = [];   // transaction log, newest first
 
-  // document-level listeners to detach on cleanup
-  const teardown: Array<() => void> = [];
+  // Every listener is registered with this signal so one abort() in the cleanup
+  // removes them all — document AND element level — which prevents duplicate
+  // handlers stacking on the persistent DOM across Fast Refresh remounts.
+  const ac = new AbortController();
+  const { signal } = ac;
 
   const speed = (): number => (skip ? 0.001 : turbo === 2 ? 0.28 : turbo === 1 ? 0.5 : 1);
   const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, Math.max(0, ms * speed())));
@@ -299,11 +302,13 @@ export function boot(): () => void {
     for (let i = 0; i < result.cascades.length; i++) {
       await playCascade(result.cascades[i], i);
       runWin += result.cascades[i].totalWin;
-      setWin(runWin);
-      // Clamp to the engine's final balance so the counter can't overshoot when
-      // the payout cap clamps the credited total (no-op when the cap isn't hit).
+      // Clamp the WIN readout and balance to the engine's actually-credited
+      // (capped) win so neither overshoots when the payout cap binds. lastWin is
+      // the capped total for this spin; both clamps are no-ops when uncapped.
+      setWin(Math.min(runWin, engine.st.lastWin));
       await animateBalanceTo(Math.min((result.freeMode ? prevBal : prevBal - engine.bet) + runWin, engine.balance));
     }
+    runWin = Math.min(runWin, engine.st.lastWin);
 
     // reconcile balance exactly with the engine
     await animateBalanceTo(engine.balance);
@@ -451,10 +456,12 @@ export function boot(): () => void {
         if (casc.golden) await featureOverlay("GOLDEN TREASURE", "The whole board transforms!", "", 1300);
         await playCascade(casc, i);
         runWin += casc.totalWin;
-        setWin(runWin);
+        // res.totalWin is this free spin's capped credited win — clamp the
+        // readout/balance to it so they can't overshoot when the cap binds.
+        setWin(Math.min(runWin, res.totalWin));
         await animateBalanceTo(Math.min(before + runWin, engine.balance));
       }
-      freeTotalWin += runWin;
+      freeTotalWin += Math.min(runWin, res.totalWin);
       $("fgLeft").textContent = String(res.freeLeft);
       $("fgMult").textContent = String(res.mult);
       if (res.extraFree > 0) showWinPop("+" + res.extraFree + " FREE GAME", false);
@@ -526,53 +533,55 @@ export function boot(): () => void {
   // Controls
   // =============================================================================
   function wireControls(): void {
-    btnSpin.addEventListener("click", handleSpinPress);
+    btnSpin.addEventListener("click", handleSpinPress, { signal });
 
     const onSpaceKey = (e: KeyboardEvent) => {
       if (e.code !== "Space") return;
       e.preventDefault();
+      // a feature overlay (BIG WIN / FREE GAME / etc.) is a blocking layer —
+      // ignore Space so it can't reach doSpin() and flip the skip flag, which
+      // would fast-forward the overlay and any free games that follow it.
+      if (!$("overlay").hidden) return;
       // don't spin behind an open modal
       if (!$("rulesModal").hidden || !$("autoModal").hidden || !$("historyModal").hidden) return;
       handleSpinPress();
     };
-    document.addEventListener("keydown", onSpaceKey);
-    teardown.push(() => document.removeEventListener("keydown", onSpaceKey));
+    document.addEventListener("keydown", onSpaceKey, { signal });
 
-    $("betPlus").addEventListener("click", () => { if (spinning) return; engine.changeBet(1); betValEl.textContent = String(engine.bet); beep(520, 0.05, "square", 0.04); });
-    $("betMinus").addEventListener("click", () => { if (spinning) return; engine.changeBet(-1); betValEl.textContent = String(engine.bet); beep(420, 0.05, "square", 0.04); });
+    $("betPlus").addEventListener("click", () => { if (spinning) return; engine.changeBet(1); betValEl.textContent = String(engine.bet); beep(520, 0.05, "square", 0.04); }, { signal });
+    $("betMinus").addEventListener("click", () => { if (spinning) return; engine.changeBet(-1); betValEl.textContent = String(engine.bet); beep(420, 0.05, "square", 0.04); }, { signal });
 
     btnTurbo.addEventListener("click", () => {
       turbo = (turbo + 1) % 3;
       btnTurbo.classList.toggle("on", turbo > 0);
       btnTurbo.classList.toggle("super", turbo === 2);
       $("turboHint").textContent = turbo === 0 ? "Press turbo spin" : turbo === 1 ? "Turbo ON" : "Super Turbo ON";
-    });
+    }, { signal });
 
     btnAuto.addEventListener("click", () => {
       if (autoRemaining > 0 || autoInfinite) { stopAuto(); return; }
       $("autoModal").hidden = false;
-    });
+    }, { signal });
 
-    $("btnSound").addEventListener("click", () => { soundOn = !soundOn; $("btnSound").classList.toggle("muted", !soundOn); $("btnSound").innerHTML = soundOn ? "&#128266;" : "&#128263;"; });
-    $("btnHistory").addEventListener("click", () => { renderHistory(); $("historyModal").hidden = false; });
-    $("historyClose").addEventListener("click", () => { $("historyModal").hidden = true; });
-    $("historyModal").addEventListener("click", (e) => { if (e.target === $("historyModal")) $("historyModal").hidden = true; });
+    $("btnSound").addEventListener("click", () => { soundOn = !soundOn; $("btnSound").classList.toggle("muted", !soundOn); $("btnSound").innerHTML = soundOn ? "&#128266;" : "&#128263;"; }, { signal });
+    $("btnHistory").addEventListener("click", () => { renderHistory(); $("historyModal").hidden = false; }, { signal });
+    $("historyClose").addEventListener("click", () => { $("historyModal").hidden = true; }, { signal });
+    $("historyModal").addEventListener("click", (e) => { if (e.target === $("historyModal")) $("historyModal").hidden = true; }, { signal });
 
     // Esc closes whichever modal is open
     const onEscKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") ["historyModal", "rulesModal", "autoModal"].forEach((id) => { if (!$(id).hidden) $(id).hidden = true; });
     };
-    document.addEventListener("keydown", onEscKey);
-    teardown.push(() => document.removeEventListener("keydown", onEscKey));
+    document.addEventListener("keydown", onEscKey, { signal });
 
     // rules modal
-    $("btnRules").addEventListener("click", () => { $("rulesModal").hidden = false; });
-    $("rulesClose").addEventListener("click", () => { $("rulesModal").hidden = true; });
-    $("rulesModal").addEventListener("click", (e) => { if (e.target === $("rulesModal")) $("rulesModal").hidden = true; });
+    $("btnRules").addEventListener("click", () => { $("rulesModal").hidden = false; }, { signal });
+    $("rulesClose").addEventListener("click", () => { $("rulesModal").hidden = true; }, { signal });
+    $("rulesModal").addEventListener("click", (e) => { if (e.target === $("rulesModal")) $("rulesModal").hidden = true; }, { signal });
 
     // autospin modal
-    $("autoClose").addEventListener("click", () => { $("autoModal").hidden = true; });
-    $("autoCancel").addEventListener("click", () => { $("autoModal").hidden = true; });
+    $("autoClose").addEventListener("click", () => { $("autoModal").hidden = true; }, { signal });
+    $("autoCancel").addEventListener("click", () => { $("autoModal").hidden = true; }, { signal });
     $("autoStart").addEventListener("click", () => {
       $("autoModal").hidden = true;
       // Don't commit to auto-spin if the player can't afford a spin — otherwise
@@ -584,7 +593,7 @@ export function boot(): () => void {
       btnAuto.classList.add("on");
       updateAutoBtn(); refreshSpinBtn();
       if (!spinning) doSpin();
-    });
+    }, { signal });
   }
 
   function stopAuto(): void { autoRemaining = 0; autoInfinite = false; btnAuto.classList.remove("on"); updateAutoBtn(); refreshSpinBtn(); }
@@ -678,7 +687,7 @@ export function boot(): () => void {
   // hand back a cleanup that detaches the document-level key listeners.
   init();
   return () => {
-    teardown.forEach((fn) => fn());
+    ac.abort();   // detaches every listener registered with `signal`
     // Release the audio context and drop the global debug hooks so a remount
     // (Fast Refresh) doesn't leave stale closures pointing at detached DOM.
     if (actx) { actx.close().catch(() => { /* ignore */ }); actx = null; }

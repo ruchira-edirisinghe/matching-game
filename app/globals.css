@@ -382,14 +382,20 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   box-shadow:0 0 50px #000, 0 0 0 4px #4a2f1066, 0 0 40px #43e8ff33, inset 0 0 40px #43e8ff0d;}
 .small-card{width:min(420px,96vw);}
 #rulesModal .modal-card{width:min(880px,96vw);}   /* wider so the rules fit in columns on desktop */
+/* the autospin & history cards have no internal scroll region (unlike rules,
+   whose body scrolls), so let the whole card scroll when its content can't fit
+   a very short (landscape) viewport — otherwise the buttons get clipped. */
+#autoModal .modal-card,#historyModal .modal-card{overflow-y:auto;}
 .modal-close{position:absolute;top:10px;right:12px;border:none;z-index:3;font-size:0;
   width:clamp(34px,3.4cqw,44px);height:clamp(34px,3.4cqw,44px);
   background:url("/assets/buttons/close.png") center/contain no-repeat;
   filter:drop-shadow(0 2px 4px #0009);transition:transform .12s,filter .15s;}
 .modal-close:hover{transform:scale(1.08);filter:drop-shadow(0 0 8px #ff6a5a99) drop-shadow(0 2px 4px #0009);}
-/* margin-right keeps the scrolling tab strip clear of the absolute close button
-   so a tab can never sit under the X (tap-target conflict on mobile). */
-.rules-tabs{display:flex;gap:7px;padding:16px 16px 12px;margin-right:clamp(52px,9vw,64px);
+/* The scrolling tab strip is held clear of the absolute close button so a tab
+   can never sit under (or be hidden behind) the X. margin-right shrinks the
+   scroll box; padding-right adds trailing scroll space so the last tab can
+   still scroll fully into the clear area. */
+.rules-tabs{display:flex;gap:7px;padding:16px 8px 12px 16px;margin-right:clamp(58px,11vw,70px);
   border-bottom:1px solid #ffd86a22;overflow-x:auto;scrollbar-width:thin;}
 .rules-tabs button{flex:0 0 auto;background:#241528;border:1px solid #ffd86a44;color:#e9d3a6;border-radius:999px;
   padding:8px 16px;font-family:var(--font-head);font-size:13px;font-weight:700;letter-spacing:.5px;
@@ -602,4 +608,15 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   .board{--board-size:clamp(120px,min(44cqh,70cqw),520px);}
   .hud{margin-bottom:clamp(6px,1.6cqh,18px);gap:1.4cqw;}
   .turbo-hint{display:none;}
+}
+
+/* ===== TINY LANDSCAPE (≤350px tall, e.g. small phones rotated) ============ */
+/* extra-aggressive shrink so the board + HUD (incl. the SPIN button) still fit
+   the very short viewport instead of the bottom row being clipped off. */
+@media (orientation:landscape) and (max-height:350px){
+  .logo img{height:clamp(24px,8cqh,58px);}
+  .board{--board-size:clamp(94px,min(38cqh,60cqw),360px);}
+  .hud{margin-bottom:max(3px,1cqh);}
+  .meter,.bet-block{min-height:clamp(32px,4.4cqw,50px);}
+  .round-btn.spin{width:clamp(40px,min(8.5cqw,13cqh),110px);height:clamp(40px,min(8.5cqw,13cqh),110px);}
 }
