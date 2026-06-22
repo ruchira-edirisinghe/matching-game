@@ -12,6 +12,7 @@ import { GTSymbols } from "@/lib/symbols";
 import { GTEngine } from "@/lib/engine";
 import { GTRules } from "@/lib/rules";
 import { fetchBlockchainSeed, deriveSpinSeed, type BlockchainSeedResult } from "@/lib/blockchainRng";
+import { loadTransactions, saveTransaction } from "@/lib/transactions";
 import type { Board, Cascade, Cell, Engine, Heights, SymbolId } from "@/lib/types";
 
 declare global {
@@ -137,6 +138,15 @@ export function boot(): () => void {
     // headless / debug hooks
     window.GT = { engine, doSpin, render: renderBoard, state: () => ({ b: currentBoard, h: currentHeights }), seedInfo: () => seedAudit };
     refreshSeed(true);   // start fetching the provably-fair blockchain seed
+
+    // Restore this player's transaction history from Firebase (seed once, before
+    // any spin this session, so live spins aren't clobbered).
+    loadTransactions().then((loaded) => {
+      if (history.length === 0 && loaded.length) {
+        history.push(...loaded);
+        if (!$("historyModal").hidden) renderHistory();
+      }
+    });
     if (/[?&]autospin/.test(location.search)) {
       autoInfinite = true; btnAuto.classList.add("on"); updateAutoBtn(); refreshSpinBtn();
       setTimeout(doSpin, 200);
@@ -551,8 +561,10 @@ export function boot(): () => void {
 
   // ---- transaction history --------------------------------------------------
   function recordHistory(type: "spin" | "free", bet: number, win: number, balance: number): void {
-    history.unshift({ time: new Date().toLocaleTimeString(), type, bet, win, balance });
+    const entry: HistoryEntry = { time: new Date().toLocaleTimeString(), type, bet, win, balance };
+    history.unshift(entry);
     if (history.length > 500) history.length = 500;
+    saveTransaction(entry);                            // persist to Firebase Realtime Database
     if (!$("historyModal").hidden) renderHistory();   // live-update if the modal is open
   }
   function renderHistory(): void {

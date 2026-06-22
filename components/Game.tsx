@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { boot } from "@/lib/controller";
+import { initAnalytics } from "@/lib/firebase";
 
 /**
  * The whole game is a single imperative controller that mutates the DOM by id.
@@ -11,6 +12,7 @@ import { boot } from "@/lib/controller";
  */
 export default function Game() {
   useEffect(() => {
+    initAnalytics();            // browser-only Firebase Analytics (fire-and-forget)
     const cleanup = boot();
     return cleanup;
   }, []);
@@ -131,7 +133,7 @@ export default function Game() {
       <div className="modal" id="historyModal" hidden>
         <div className="modal-card">
           <button className="modal-close" id="historyClose" aria-label="Close">&times;</button>
-          <h2 className="modal-title">Transaction History</h2>
+          <h2 className="modal-title">Transaction<br className="hist-break" /> History</h2>
           <div className="history-head">
             <span>Time</span><span>Bet</span><span>Win</span><span>Balance</span>
           </div>
