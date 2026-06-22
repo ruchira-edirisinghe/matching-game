@@ -32,15 +32,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {/* External fonts + the cell-break GIF preload. React hoists these
-            <link> elements into <head>. */}
+        {/* External fonts. React hoists these <link> elements into <head>.
+            (The cell-break GIF is warmed from JS in the controller instead of a
+            <link rel=preload>, which the browser flags as "unused" because the
+            GIF isn't needed until a spin's cascade plays.) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Marcellus+SC&family=Spectral:wght@400;500;700&display=swap"
           rel="stylesheet"
         />
-        <link rel="preload" as="image" href="/assets/cell-break.gif" />
         {children}
       </body>
     </html>

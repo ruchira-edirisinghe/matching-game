@@ -21,14 +21,20 @@ export interface TxnEntry {
 const MAX = 500;                // keep history bounded (matches the in-memory cap)
 const PID_KEY = "aether_playerId";
 
+let _memPlayerId: string | null = null;
+const newPlayerId = (): string => "player_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10);
+
 export function getPlayerId(): string {
   if (typeof window === "undefined") return "server";
-  let id = localStorage.getItem(PID_KEY);
-  if (!id) {
-    id = "player_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10);
-    localStorage.setItem(PID_KEY, id);
+  try {
+    let id = localStorage.getItem(PID_KEY);
+    if (!id) { id = newPlayerId(); localStorage.setItem(PID_KEY, id); }
+    return id;
+  } catch {
+    // localStorage blocked (private mode / disabled cookies) — use a stable
+    // per-session id so history still works in memory for this session.
+    return (_memPlayerId ||= newPlayerId());
   }
-  return id;
 }
 
 // Load the player's most recent transactions, newest first (to match the log).
@@ -37,7 +43,20 @@ export async function loadTransactions(): Promise<TxnEntry[]> {
   try {
     const snap = await get(query(ref(getDb(), `transactions/${getPlayerId()}`), orderByKey(), limitToLast(MAX)));
     const out: TxnEntry[] = [];
-    snap.forEach((c) => { out.push(c.val() as TxnEntry); });
+    // Coerce every field — the DB is shared/tamperable, so never trust its shape
+    // (prevents Rs NaN and bad types flowing into the renderer).
+    snap.forEach((c) => {
+      const v = c.val() as Partial<TxnEntry> | null;
+      if (!v || typeof v !== "object") return;
+      out.push({
+        time: String(v.time ?? ""),
+        type: v.type === "free" ? "free" : "spin",
+        bet: Number(v.bet) || 0,
+        win: Number(v.win) || 0,
+        balance: Number(v.balance) || 0,
+        ts: Number(v.ts) || 0,
+      });
+    });
     return out.reverse();
   } catch (e) {
     console.warn("[firebase] loadTransactions failed (check RTDB rules):", e);

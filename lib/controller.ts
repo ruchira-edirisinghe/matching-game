@@ -73,6 +73,9 @@ export function boot(): () => void {
   // ---- formatting ------------------------------------------------------------
   const fmtMoney = (n: number): string => Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtInt = (n: number): string => Math.round(n).toLocaleString("en-US");
+  // Escape strings that come from the (shared/tamperable) database before they
+  // go into innerHTML — defends against stored XSS via a transaction's time.
+  const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 
   // ---- provably-fair RNG seeding (blockchain) --------------------------------
   // A verifiable seed is pulled from the same blockchain service the horse game
@@ -113,6 +116,10 @@ export function boot(): () => void {
   function init(): void {
     $("filter-defs").innerHTML = S.FILTER_DEFS;
 
+    // Warm the cascade break-frame GIF so it's cached before the first break
+    // animation (replaces the <link rel=preload> the browser flagged as unused).
+    if (typeof Image !== "undefined") { new Image().src = "/assets/cell-break.gif"; }
+
     // decorative art
     $("runeRing").innerHTML = S.art.techRune();
 
@@ -142,10 +149,14 @@ export function boot(): () => void {
     // Restore this player's transaction history from Firebase (seed once, before
     // any spin this session, so live spins aren't clobbered).
     loadTransactions().then((loaded) => {
-      if (history.length === 0 && loaded.length) {
-        history.push(...loaded);
-        if (!$("historyModal").hidden) renderHistory();
-      }
+      if (!loaded.length) return;
+      // Append restored (older) history beneath any spins already played this
+      // session — the loaded snapshot predates them, so there's no overlap. (The
+      // old "seed only if empty" check dropped restored history whenever a spin
+      // landed before this resolved, e.g. on the ?autospin path.)
+      history.push(...loaded);
+      if (history.length > 500) history.length = 500;
+      if (!$("historyModal").hidden) renderHistory();
     });
     if (/[?&]autospin/.test(location.search)) {
       autoInfinite = true; btnAuto.classList.add("on"); updateAutoBtn(); refreshSpinBtn();
@@ -575,7 +586,7 @@ export function boot(): () => void {
         ? `<span class="history-win">+Rs ${fmtMoney(h.win)}</span>`
         : `<span class="history-win zero">Rs 0.00</span>`;
       const bet = h.type === "free" ? '<span class="history-tag">FREE</span>' : "Rs " + fmtInt(h.bet);
-      return `<div class="history-row"><span class="history-time">${h.time}</span><span>${bet}</span><span>${win}</span><span class="history-bal">Rs ${fmtMoney(h.balance)}</span></div>`;
+      return `<div class="history-row"><span class="history-time">${esc(h.time)}</span><span>${bet}</span><span>${win}</span><span class="history-bal">Rs ${fmtMoney(h.balance)}</span></div>`;
     }).join("");
   }
 
