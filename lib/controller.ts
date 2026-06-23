@@ -59,6 +59,8 @@ export function boot(): () => void {
   let autoRemaining = 0, autoInfinite = false;
   let autoSelected: number | "inf" = 10;
   let shownBalance = engine.balance;
+  let gameReady = false;     // splash "Loading…" clears once the first board + seed are ready
+  let splashGone = false;    // guards the splash dismissal so it fires exactly once
   const history: HistoryEntry[] = [];   // transaction log, newest first
 
   // Every listener is registered with this signal so one abort() in the cleanup
@@ -144,7 +146,19 @@ export function boot(): () => void {
 
     // headless / debug hooks
     window.GT = { engine, doSpin, render: renderBoard, state: () => ({ b: currentBoard, h: currentHeights }), seedInfo: () => seedAudit };
-    refreshSeed(true);   // start fetching the provably-fair blockchain seed
+
+    // Provably-fair seeding: fetch the first blockchain seed and clear the
+    // splash's "Loading…" state once it lands — or after a short cap, so a slow
+    // or failed fetch never strands the player on the splash. (This is the
+    // initial equivalent of refreshSeed(true); later spins use the throttled
+    // background refresh in seedNextSpin.) The first board is already on screen.
+    const readyCap = setTimeout(markReady, 1600);
+    const revealStart = () => { if (signal.aborted) return; clearTimeout(readyCap); markReady(); };
+    seedFetching = true; lastSeedFetch = Date.now();
+    fetchBlockchainSeed(signal)
+      .then((r) => { if (!signal.aborted) seedAudit = r; })
+      .catch(() => { /* per-spin fallback covers a missing seed */ })
+      .finally(() => { seedFetching = false; revealStart(); });
 
     // Restore this player's transaction history from Firebase (seed once, before
     // any spin this session, so live spins aren't clobbered).
@@ -158,6 +172,8 @@ export function boot(): () => void {
       if (history.length > 500) history.length = 500;
       if (!$("historyModal").hidden) renderHistory();
     });
+    // Deep links that auto-launch a flow shouldn't sit behind the splash screen.
+    if (/[?&](autospin|free|rules)/.test(location.search)) $("startScreen").hidden = true;
     if (/[?&]autospin/.test(location.search)) {
       autoInfinite = true; btnAuto.classList.add("on"); updateAutoBtn(); refreshSpinBtn();
       setTimeout(doSpin, 200);
@@ -313,6 +329,32 @@ export function boot(): () => void {
   function handleSpinPress(): void {
     if (autoInfinite || autoRemaining > 0) { stopAuto(); skip = true; return; }
     doSpin();
+  }
+
+  // ---- start / splash screen ------------------------------------------------
+  // Swap the START button out of its "Loading…" state once the game is ready.
+  function markReady(): void {
+    if (gameReady) return;
+    gameReady = true;
+    const btn = document.getElementById("btnStart") as HTMLButtonElement | null;
+    if (!btn) return;
+    btn.disabled = false;
+    btn.setAttribute("aria-busy", "false");
+    btn.classList.remove("loading");
+    const t = btn.querySelector(".start-btn-txt");
+    if (t) t.textContent = "START GAME";
+  }
+
+  // Fade the splash out to reveal the game. Ignored until the game is ready, and
+  // fires exactly once (Start click, Space, and Enter all funnel through here).
+  function dismissStart(): void {
+    if (!gameReady || splashGone) return;
+    splashGone = true;
+    beep(660, 0.12, "triangle", 0.05);   // confirm blip; also primes the AudioContext on this gesture
+    const ss = document.getElementById("startScreen");
+    if (!ss) return;
+    ss.classList.add("hide");
+    setTimeout(() => { ss.hidden = true; }, 600);   // remove from layout after the fade
   }
 
   async function preSpin(): Promise<void> {
@@ -594,11 +636,26 @@ export function boot(): () => void {
   // Controls
   // =============================================================================
   function wireControls(): void {
+    // start / splash screen — Start (click) or Space/Enter fades it out to
+    // reveal the game beneath. dismissStart() ignores input until the game is
+    // ready (see markReady) and only fires once.
+    $("btnStart").addEventListener("click", dismissStart, { signal });
+    const onStartKey = (e: KeyboardEvent) => {
+      if ($("startScreen").hidden) return;   // splash already gone
+      if (e.code === "Space" || e.code === "Enter" || e.code === "NumpadEnter") {
+        e.preventDefault();
+        dismissStart();
+      }
+    };
+    document.addEventListener("keydown", onStartKey, { signal });
+
     btnSpin.addEventListener("click", handleSpinPress, { signal });
 
     const onSpaceKey = (e: KeyboardEvent) => {
       if (e.code !== "Space") return;
       e.preventDefault();
+      // splash is up → Space dismisses it (onStartKey), never spins behind it
+      if (!$("startScreen").hidden) return;
       // a feature overlay (BIG WIN / FREE GAME / etc.) is a blocking layer —
       // ignore Space so it can't reach doSpin() and flip the skip flag, which
       // would fast-forward the overlay and any free games that follow it.

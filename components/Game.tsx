@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { boot } from "@/lib/controller";
-import { initAnalytics } from "@/lib/firebase";
 
 /**
  * The whole game is a single imperative controller that mutates the DOM by id.
@@ -12,7 +11,6 @@ import { initAnalytics } from "@/lib/firebase";
  */
 export default function Game() {
   useEffect(() => {
-    initAnalytics();            // browser-only Firebase Analytics (fire-and-forget)
     const cleanup = boot();
     return cleanup;
   }, []);
@@ -144,6 +142,18 @@ export default function Game() {
       {/* ===================== FEATURE OVERLAY ===================== */}
       <div className="overlay" id="overlay" hidden>
         <div className="overlay-inner" id="overlayInner" />
+      </div>
+
+      {/* ===================== START / SPLASH SCREEN ===================== */}
+      <div className="start-screen" id="startScreen">
+        <div className="bg-grid" />
+        <div className="start-inner">
+          <img className="start-logo" src="/assets/logo.png" alt="Aether Dynasty" draggable={false} />
+          <p className="start-tagline">Provably-Fair Cascading Slots</p>
+          <button className="start-btn loading" id="btnStart" type="button" disabled aria-busy="true">
+            <span className="start-btn-txt">Loading&hellip;</span>
+          </button>
+        </div>
       </div>
     </>
   );

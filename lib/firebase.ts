@@ -1,16 +1,17 @@
 // Firebase initialization for the Aether Dynasty slot.
 // ---------------------------------------------------------------------------
-// `initializeApp` is isomorphic (safe during SSR / `next build`), but Firebase
-// Analytics is browser-only — calling `getAnalytics()` at module load would crash
-// server rendering. So the app is created at import time and analytics is created
-// lazily on the client via `initAnalytics()`, guarded by `isSupported()`.
+// `initializeApp` is isomorphic (safe during SSR / `next build`). The app is
+// created at import time; the Realtime Database is built lazily in the browser.
+//
+// Firebase Analytics is intentionally NOT loaded: it injects Google's gtag.js
+// script, which ad/privacy blockers cancel with `net::ERR_BLOCKED_BY_CLIENT`
+// (a browser-level error that no try/catch can suppress), and we log no events.
 //
 // NOTE: the Firebase web config (incl. apiKey) is a public client identifier, not
 // a secret — it's meant to ship in the browser bundle. Access is controlled by
 // Firebase security rules, not by hiding this config.
 
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
-import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
 import { getDatabase, type Database } from "firebase/database";
 
 const firebaseConfig = {
@@ -21,7 +22,6 @@ const firebaseConfig = {
   storageBucket: "matching-game-3bf15.firebasestorage.app",
   messagingSenderId: "336440464725",
   appId: "1:336440464725:web:7d0e8c5e496950664a0bdc",
-  measurementId: "G-GKSKWMSD3V",
 };
 
 // Reuse an existing app so Fast Refresh / repeated imports don't re-initialize.
@@ -33,18 +33,4 @@ let _db: Database | null = null;
 export function getDb(): Database {
   if (!_db) _db = getDatabase(app);
   return _db;
-}
-
-// Analytics is created once, only in a supporting browser environment.
-export let analytics: Analytics | null = null;
-
-export async function initAnalytics(): Promise<Analytics | null> {
-  if (typeof window === "undefined" || analytics) return analytics;
-  try {
-    if (await isSupported()) analytics = getAnalytics(app);
-  } catch (e) {
-    // Unsupported browser, blocked by privacy settings, offline, etc. — never fatal.
-    console.warn("[firebase] analytics init skipped:", e);
-  }
-  return analytics;
 }

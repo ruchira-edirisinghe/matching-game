@@ -522,6 +522,61 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   animation:coinFall linear forwards;}
 @keyframes coinFall{to{transform:translateY(110vh) rotate(540deg);opacity:.4;}}
 
+/* ---- start / splash screen ------------------------------------------------ *
+   The entry screen: same temple background + neon grid, logo centred, and a
+   gold START button. It sits above the game (z 100, over modals at 50 and the
+   feature overlay at 60) and fades out on Start to reveal the game beneath. */
+.start-screen{position:fixed;inset:0;z-index:100;display:grid;place-items:center;
+  background:url('/assets/background.gif') center/cover no-repeat #0a0510;
+  animation:fade .4s ease;}
+.start-screen .bg-grid{z-index:1;}
+.start-screen::before{ /* vignette so the logo + button read clearly */
+  content:"";position:absolute;inset:0;z-index:1;
+  background:radial-gradient(circle at 50% 42%, #0a05106b 0%, #06030acc 68%, #020107 100%);}
+.start-screen.hide{animation:startOut .55s ease forwards;pointer-events:none;}
+@keyframes startOut{to{opacity:0;transform:scale(1.04);}}
+
+.start-inner{position:relative;z-index:2;display:flex;flex-direction:column;
+  align-items:center;gap:clamp(18px,4.4vmin,42px);padding:5vmin;text-align:center;
+  animation:startIn .8s cubic-bezier(.2,1,.3,1) both;}
+@keyframes startIn{from{opacity:0;transform:translateY(20px) scale(.96);}to{opacity:1;transform:none;}}
+
+.start-logo{width:auto;height:clamp(120px,33vmin,360px);max-width:84vw;display:block;
+  filter:drop-shadow(0 0 28px #43e8ff88) drop-shadow(0 6px 18px #000b);
+  animation:logoFlick 6s infinite, startFloat 5s ease-in-out infinite;}
+@keyframes startFloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
+
+.start-tagline{margin:0;font-family:var(--font-fx);text-transform:uppercase;
+  font-size:clamp(11px,2vmin,18px);letter-spacing:.32em;color:var(--neon-2);
+  text-shadow:0 0 12px #43e8ff66;opacity:.92;}
+
+.start-btn{position:relative;font-family:var(--font-fx);font-weight:900;
+  text-transform:uppercase;letter-spacing:.16em;color:#2a1a05;
+  font-size:clamp(16px,3.2vmin,30px);
+  padding:clamp(14px,2.4vmin,22px) clamp(34px,7vmin,78px);
+  border:none;border-radius:999px;cursor:pointer;
+  background:linear-gradient(180deg,#fff6c8 0%,#f4c64a 42%,#d59a26 70%,#a4600f 100%);
+  box-shadow:0 0 0 3px #00000080, 0 0 22px #43e8ff99, 0 8px 22px #000a,
+    inset 0 2px 2px #ffffffaa, inset 0 -3px 6px #00000055;
+  animation:startBtnPulse 2.2s ease-in-out infinite;
+  transition:transform .12s ease, filter .12s ease;}
+.start-btn:hover{filter:brightness(1.08);transform:translateY(-2px);}
+.start-btn:active{transform:translateY(1px) scale(.98);}
+
+/* "Loading…" state: dimmed, no pulse/hover lift, with a small spinner ring */
+.start-btn.loading,.start-btn:disabled{cursor:progress;color:#5a4a2e;
+  filter:saturate(.55) brightness(.92);animation:none;
+  box-shadow:0 0 0 3px #00000080,0 6px 16px #0008,inset 0 2px 2px #ffffff66,inset 0 -3px 6px #00000055;}
+.start-btn.loading:hover,.start-btn:disabled:hover{filter:saturate(.55) brightness(.92);transform:none;}
+.start-btn.loading .start-btn-txt{position:relative;display:inline-block;padding-left:1.7em;}
+.start-btn.loading .start-btn-txt::before{content:"";position:absolute;left:0;top:50%;
+  width:1.05em;height:1.05em;margin-top:-.53em;border-radius:50%;
+  border:2px solid #5a4a2e55;border-top-color:#5a4a2e;animation:startSpin .7s linear infinite;}
+@keyframes startSpin{to{transform:rotate(360deg);}}
+@keyframes startBtnPulse{
+  0%,100%{box-shadow:0 0 0 3px #00000080,0 0 16px #43e8ff77,0 8px 22px #000a,inset 0 2px 2px #ffffffaa,inset 0 -3px 6px #00000055;}
+  50%{box-shadow:0 0 0 3px #00000080,0 0 36px #43e8ff,0 8px 22px #000a,inset 0 2px 2px #ffffffaa,inset 0 -3px 6px #00000055;}}
+
 /* ---- responsive ----------------------------------------------------------- *
    On landscape/desktop the stage scales its interior with container units
    (cqw/cqh) and the HUD sits in one row. On a narrow portrait screen those
