@@ -120,7 +120,11 @@ export function boot(): () => void {
 
     // Warm the cascade break-frame GIF so it's cached before the first break
     // animation (replaces the <link rel=preload> the browser flagged as unused).
-    if (typeof Image !== "undefined") { new Image().src = "/assets/cell-break.gif"; }
+    // Also warm the START → game transition GIF so it plays instantly on click.
+    if (typeof Image !== "undefined") {
+      new Image().src = "/assets/cell-break.gif";
+      new Image().src = "/assets/transition.gif";
+    }
 
     // decorative art
     $("runeRing").innerHTML = S.art.techRune();
@@ -345,16 +349,57 @@ export function boot(): () => void {
     if (t) t.textContent = "START GAME";
   }
 
-  // Fade the splash out to reveal the game. Ignored until the game is ready, and
-  // fires exactly once (Start click, Space, and Enter all funnel through here).
+  // Reveal the game on Start. Ignored until the game is ready, and fires exactly
+  // once (Start click, Space, and Enter all funnel through here). The sequence:
+  // play the portal transition GIF full-screen, then crossfade — the transition
+  // fades out while the game screen (with its normal background GIF) fades in.
+  const TRANSITION_HOLD = 2600;   // ms the transition plays before the game fades in (tunable)
   function dismissStart(): void {
     if (!gameReady || splashGone) return;
     splashGone = true;
     beep(660, 0.12, "triangle", 0.05);   // confirm blip; also primes the AudioContext on this gesture
+
     const ss = document.getElementById("startScreen");
-    if (!ss) return;
-    ss.classList.add("hide");
-    setTimeout(() => { ss.hidden = true; }, 600);   // remove from layout after the fade
+    const tr = document.getElementById("transition");
+    const trGif = document.getElementById("transitionGif") as HTMLImageElement | null;
+    const game = document.getElementById("game");
+
+    // Fallback: if the transition layer isn't present, just fade the splash out.
+    if (!tr || !trGif || !game) {
+      if (ss) { ss.classList.add("hide"); setTimeout(() => { ss.hidden = true; }, 600); }
+      return;
+    }
+
+    const runTransition = (): void => {
+      // 1) play the transition GIF on top of everything, fading it in over the
+      //    splash (frame 0 ≈ the splash art, so the hand-off is seamless).
+      tr.hidden = false;
+      void tr.offsetWidth;             // reflow so the .show opacity transition runs
+      tr.classList.add("show");
+
+      // 2) once the GIF covers the screen, drop the splash underneath it
+      setTimeout(() => { if (ss) ss.hidden = true; }, 500);
+
+      // 3) crossfade. Start the game fading in first, then lift the transition a
+      //    beat later — by the time it thins, the game is already most of the way
+      //    in, so there's no dark gap and the reveal stays smooth.
+      setTimeout(() => { game.classList.add("reveal-in"); }, TRANSITION_HOLD);
+      setTimeout(() => { tr.classList.add("out"); }, TRANSITION_HOLD + 300);
+
+      // 4) tidy up after the crossfade — remove the transition layer + temp class
+      setTimeout(() => {
+        tr.hidden = true;
+        tr.classList.remove("show", "out");
+        trGif.removeAttribute("src");  // free the decoded frames
+        game.classList.remove("reveal-in");
+      }, TRANSITION_HOLD + 1400);
+    };
+
+    // Decode the (warmed, cached) GIF before showing so its first frame paints
+    // instantly — no dark flash during the fade-in. Falls back to showing now.
+    trGif.src = "/assets/transition.gif";
+    if (typeof trGif.decode === "function") trGif.decode().then(runTransition, runTransition);
+    else runTransition();
   }
 
   async function preSpin(): Promise<void> {

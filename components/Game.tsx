@@ -146,14 +146,17 @@ export default function Game() {
 
       {/* ===================== START / SPLASH SCREEN ===================== */}
       <div className="start-screen" id="startScreen">
-        <div className="bg-grid" />
         <div className="start-inner">
           <img className="start-logo" src="/assets/logo.png" alt="Aether Dynasty" draggable={false} />
-          <p className="start-tagline">Provably-Fair Cascading Slots</p>
           <button className="start-btn loading" id="btnStart" type="button" disabled aria-busy="true">
             <span className="start-btn-txt">Loading&hellip;</span>
           </button>
         </div>
+      </div>
+
+      {/* ============ START → GAME TRANSITION (portal sting) ============ */}
+      <div className="transition-fx" id="transition" hidden>
+        <img className="transition-gif" id="transitionGif" alt="" aria-hidden="true" draggable={false} />
       </div>
     </>
   );
