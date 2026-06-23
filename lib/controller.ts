@@ -415,8 +415,9 @@ export function boot(): () => void {
 
   // Reveal the game on Start. Ignored until the game is ready, and fires exactly
   // once (Start click, Space, and Enter all funnel through here). The sequence:
-  // FLASH → play the portal transition video IN FULL → FLASH → game (race) screen.
-  // Each flash masks the scene swap underneath it, so the cuts are smooth.
+  // a YELLOW flash bursts → under its peak the transition video starts and plays
+  // IN FULL → a second flash → the game (race) screen. The flash is the visible
+  // first beat; the swap underneath it is unseen.
   function dismissStart(): void {
     if (!gameReady || splashGone) return;
     splashGone = true;
@@ -431,31 +432,29 @@ export function boot(): () => void {
     if (!tr || !vid || !game) { if (ss) ss.hidden = true; return; }
 
     let finished = false;
-    // FLASH 2 — when the clip ends (or the safety net fires), a flash masks a
-    // smooth fade from the transition to the game (race) screen. Detaches its
+    // FLASH 2 — when the clip ends (or the safety net fires), a flash bursts and
+    // under its peak the transition cuts to the game (race) screen. Detaches its
     // own listener so the Home → Start round-trip re-arms without stacking.
     const finish = (): void => {
       if (finished) return;
       finished = true;
       vid.removeEventListener("ended", finish);
       flash(() => {
-        tr.classList.remove("show");     // fade the transition out → game shows beneath
-        setTimeout(() => { tr.hidden = true; try { vid.pause(); vid.currentTime = 0; } catch { /* ignore */ } }, 450);
+        tr.hidden = true;                // cut under the flash peak → reveals the game
+        try { vid.pause(); vid.currentTime = 0; } catch { /* ignore */ }
       });
     };
     vid.addEventListener("ended", finish, { signal });
 
-    // FLASH 1 — a flash masks a smooth fade from the splash to the transition
-    // video (played from the start).
+    // FLASH 1 — show the yellow flash first; under its peak, start the transition
+    // video (splash hidden, transition shown and played from frame 0).
     flash(() => {
+      if (ss) ss.hidden = true;
       tr.hidden = false;
-      void tr.offsetWidth;               // reflow so the fade-in transition runs
-      tr.classList.add("show");          // fade the transition in over the splash
       vid.muted = true;
       try { vid.currentTime = 0; } catch { /* metadata may not be ready; harmless */ }
       const p = vid.play();
       if (p && typeof p.catch === "function") p.catch(() => { /* blocked → safety net covers it */ });
-      setTimeout(() => { if (ss) ss.hidden = true; }, 450);   // drop the splash once the transition has faded in
     });
 
     // safety net: if 'ended' never fires (decode stall / blocked play), force-finish
