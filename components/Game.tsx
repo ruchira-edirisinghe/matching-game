@@ -197,14 +197,11 @@ export default function Game() {
         </div>
       </div>
 
-      {/* ============ START → GAME TRANSITION (portal sting) ============ */}
+      {/* ====== START → GAME TRANSITION (fades in over splash, out to game) ====== */}
       <div className="transition-fx" id="transition" hidden>
         <video className="transition-vid" id="transitionVid" src="/assets/transition.mp4"
           muted playsInline preload="auto" aria-hidden="true" />
       </div>
-
-      {/* white flash that masks each hard cut (splash→transition, transition→game) */}
-      <div className="flash" id="flash" aria-hidden="true" />
     </>
   );
 }

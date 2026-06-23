@@ -388,18 +388,6 @@ export function boot(): () => void {
     intro.addEventListener("ended", toLoop, { signal });
   }
 
-  // A quick flash that masks a hard cut. `atPeak` runs while the screen is fully
-  // covered (the flash's bright peak), so the scene swap underneath is unseen.
-  function flash(atPeak?: () => void): void {
-    const fl = document.getElementById("flash");
-    if (!fl) { atPeak?.(); return; }
-    fl.classList.remove("go");
-    void fl.offsetWidth;                  // restart the animation if it's mid-flight
-    fl.classList.add("go");
-    if (atPeak) setTimeout(atPeak, 250);  // during the held peak (≈25% of the 1s flash)
-    setTimeout(() => fl.classList.remove("go"), 1050);
-  }
-
   // Swap the START button out of its "Loading…" state once the game is ready.
   function markReady(): void {
     if (gameReady) return;
@@ -414,10 +402,9 @@ export function boot(): () => void {
   }
 
   // Reveal the game on Start. Ignored until the game is ready, and fires exactly
-  // once (Start click, Space, and Enter all funnel through here). The sequence:
-  // a YELLOW flash bursts → under its peak the transition video starts and plays
-  // IN FULL → a second flash → the game (race) screen. The flash is the visible
-  // first beat; the swap underneath it is unseen.
+  // once (Start click, Space, and Enter all funnel through here). The sequence is
+  // a smooth crossfade: the transition video FADES IN over the splash → plays IN
+  // FULL → FADES OUT to reveal the game (race) screen beneath it. No flash.
   function dismissStart(): void {
     if (!gameReady || splashGone) return;
     splashGone = true;
@@ -432,30 +419,30 @@ export function boot(): () => void {
     if (!tr || !vid || !game) { if (ss) ss.hidden = true; return; }
 
     let finished = false;
-    // FLASH 2 — when the clip ends (or the safety net fires), a flash bursts and
-    // under its peak the transition cuts to the game (race) screen. Detaches its
-    // own listener so the Home → Start round-trip re-arms without stacking.
+    // Exit — when the clip ends (or the safety net fires), FADE the transition
+    // OUT to reveal the game beneath. Detaches its own listener so the Home →
+    // Start round-trip re-arms without stacking handlers.
     const finish = (): void => {
       if (finished) return;
       finished = true;
       vid.removeEventListener("ended", finish);
-      flash(() => {
-        tr.hidden = true;                // cut under the flash peak → reveals the game
+      tr.classList.remove("show");         // fade out (.55s) → game shows beneath
+      setTimeout(() => {
+        tr.hidden = true;
         try { vid.pause(); vid.currentTime = 0; } catch { /* ignore */ }
-      });
+      }, 600);
     };
     vid.addEventListener("ended", finish, { signal });
 
-    // FLASH 1 — show the yellow flash first; under its peak, start the transition
-    // video (splash hidden, transition shown and played from frame 0).
-    flash(() => {
-      if (ss) ss.hidden = true;
-      tr.hidden = false;
-      vid.muted = true;
-      try { vid.currentTime = 0; } catch { /* metadata may not be ready; harmless */ }
-      const p = vid.play();
-      if (p && typeof p.catch === "function") p.catch(() => { /* blocked → safety net covers it */ });
-    });
+    // Enter — FADE the transition IN over the splash, then play it from frame 0.
+    tr.hidden = false;
+    void tr.offsetWidth;                   // reflow so the fade-in transition runs
+    tr.classList.add("show");              // fade in (.55s)
+    vid.muted = true;
+    try { vid.currentTime = 0; } catch { /* metadata may not be ready; harmless */ }
+    const p = vid.play();
+    if (p && typeof p.catch === "function") p.catch(() => { /* blocked → safety net covers it */ });
+    setTimeout(() => { if (ss) ss.hidden = true; }, 600);   // drop the splash once the transition has faded in
 
     // safety net: if 'ended' never fires (decode stall / blocked play), force-finish
     const durMs = (vid.duration && isFinite(vid.duration) ? vid.duration : 8.5) * 1000 + 1800;

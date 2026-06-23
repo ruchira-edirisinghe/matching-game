@@ -95,9 +95,13 @@ export function fetchBlockchainSeed(signal?: AbortSignal): Promise<BlockchainSee
             else fallback(`Service kept rejecting timestamps: ${msg}`);
             return;
           }
-          // Other / transient error — short retry at the same lag.
-          if (networkRetries-- > 0) setTimeout(attempt, 1200);
-          else fallback(`Last error: ${msg}`);
+          // An HTTP error response (e.g. a 502 Azure cold-start) won't fix in
+          // ~1s, so fall back immediately and let the throttled periodic refresh
+          // recover it — this avoids hammering a down service with rapid retries
+          // (and the matching console noise). A 200 with an unexpected body still
+          // gets one short retry, since that can be a transient app-level glitch.
+          if (!r.ok || networkRetries-- <= 0) fallback(`Last error: ${msg}`);
+          else setTimeout(attempt, 1200);
         })
         .catch((err: unknown) => {
           clearTimeout(timeoutId);
