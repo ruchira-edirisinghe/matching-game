@@ -122,13 +122,14 @@ export function boot(): () => void {
     // animation (replaces the <link rel=preload> the browser flagged as unused).
     if (typeof Image !== "undefined") { new Image().src = "/assets/cell-break.gif"; }
 
-    // Background/transition videos: force-mute (React doesn't reliably reflect
-    // the `muted` attribute) so autoplay is allowed, then start the looping
-    // backgrounds. The portal transition is preloaded via its markup.
+    // Videos: force-mute (React doesn't reliably reflect the `muted` attribute)
+    // so autoplay is allowed. The in-game background loops immediately; the splash
+    // runs its intro→loop sequence (setupSplashBg); the transition is preloaded only.
     document.querySelectorAll<HTMLVideoElement>("video.start-bg, video.screen-bg, #transitionVid")
       .forEach((v) => { v.muted = true; });
-    document.querySelectorAll<HTMLVideoElement>("video.start-bg, video.screen-bg")
+    document.querySelectorAll<HTMLVideoElement>("video.screen-bg")
       .forEach((v) => { v.play().catch(() => { /* autoplay may defer; harmless */ }); });
+    setupSplashBg();
 
     // decorative art
     $("runeRing").innerHTML = S.art.techRune();
@@ -340,6 +341,36 @@ export function boot(): () => void {
   }
 
   // ---- start / splash screen ------------------------------------------------
+  // Splash background: play the start_screen intro once, then crossfade to the
+  // looping startscreen2 and loop that one forever.
+  function setupSplashBg(): void {
+    const intro = document.getElementById("startBg1") as HTMLVideoElement | null;
+    const loop = document.getElementById("startBg2") as HTMLVideoElement | null;
+    if (!intro || !loop) return;
+    intro.muted = true; loop.muted = true;
+    intro.play().catch(() => { /* autoplay may defer; harmless */ });
+    const toLoop = (): void => {
+      intro.classList.remove("show");     // fade the intro out…
+      loop.classList.add("show");         // …and the looping clip in
+      try { loop.currentTime = 0; } catch { /* ignore */ }
+      loop.play().catch(() => { /* ignore */ });
+      setTimeout(() => { try { intro.pause(); } catch { /* ignore */ } }, 700);
+    };
+    intro.addEventListener("ended", toLoop, { signal });
+  }
+
+  // A quick flash that masks a hard cut. `atPeak` runs while the screen is fully
+  // covered (the flash's bright peak), so the scene swap underneath is unseen.
+  function flash(atPeak?: () => void): void {
+    const fl = document.getElementById("flash");
+    if (!fl) { atPeak?.(); return; }
+    fl.classList.remove("go");
+    void fl.offsetWidth;                  // restart the animation if it's mid-flight
+    fl.classList.add("go");
+    if (atPeak) setTimeout(atPeak, 180);  // ~ the peak (24% of the .72s flash)
+    setTimeout(() => fl.classList.remove("go"), 760);
+  }
+
   // Swap the START button out of its "Loading…" state once the game is ready.
   function markReady(): void {
     if (gameReady) return;
@@ -355,9 +386,8 @@ export function boot(): () => void {
 
   // Reveal the game on Start. Ignored until the game is ready, and fires exactly
   // once (Start click, Space, and Enter all funnel through here). The sequence:
-  // play the portal transition video IN FULL, fade the game in during its final
-  // stretch, then fade the transition out exactly when the clip ends — a clean
-  // crossfade that lands on the portal climax.
+  // FLASH → play the portal transition video IN FULL → FLASH → game (race) screen.
+  // Each flash masks the scene swap underneath it, so the cuts are smooth.
   function dismissStart(): void {
     if (!gameReady || splashGone) return;
     splashGone = true;
@@ -368,52 +398,37 @@ export function boot(): () => void {
     const vid = document.getElementById("transitionVid") as HTMLVideoElement | null;
     const game = document.getElementById("game");
 
-    // Fallback: if the transition layer isn't present, just fade the splash out.
-    if (!tr || !vid || !game) {
-      if (ss) { ss.classList.add("hide"); setTimeout(() => { ss.hidden = true; }, 600); }
-      return;
-    }
+    // Fallback: if the transition layer isn't present, just hide the splash.
+    if (!tr || !vid || !game) { if (ss) ss.hidden = true; return; }
 
     let finished = false;
-    // Start fading the game in during the clip's final ~0.85s so the crossfade
-    // overlaps the climax.
-    const onTime = (): void => {
-      if (vid.duration && vid.currentTime >= vid.duration - 0.85) {
-        game.classList.add("reveal-in");
-        vid.removeEventListener("timeupdate", onTime);
-      }
-    };
-    // Finish when the clip ends (or via the safety net): lift the transition off
-    // the now-revealed game. Detaches its own listeners so the Home → Start
+    // FLASH 2 — when the clip ends (or the safety net fires), flash and cut to
+    // the game (race) screen. Detaches its own listener so the Home → Start
     // round-trip re-arms cleanly without stacking handlers.
     const finish = (): void => {
       if (finished) return;
       finished = true;
-      vid.removeEventListener("timeupdate", onTime);
       vid.removeEventListener("ended", finish);
-      game.classList.add("reveal-in");   // ensure the game is fading/faded in
-      tr.classList.add("out");           // lift the transition off it
-      setTimeout(() => {
-        tr.hidden = true;
-        tr.classList.remove("show", "out");
-        game.classList.remove("reveal-in");
-        try { vid.pause(); } catch { /* ignore */ }
-      }, 1000);
+      flash(() => {
+        tr.hidden = true;                // hidden under the flash → reveals the game
+        try { vid.pause(); vid.currentTime = 0; } catch { /* ignore */ }
+      });
     };
-    vid.addEventListener("timeupdate", onTime, { signal });
     vid.addEventListener("ended", finish, { signal });
 
-    // show the transition over the splash, drop the splash beneath it, play from 0
-    tr.hidden = false;
-    void tr.offsetWidth;                 // reflow so the .show opacity transition runs
-    tr.classList.add("show");
-    setTimeout(() => { if (ss) ss.hidden = true; }, 500);
-    try { vid.currentTime = 0; } catch { /* metadata may not be ready; harmless */ }
-    const p = vid.play();
-    if (p && typeof p.catch === "function") p.catch(() => { /* blocked → safety net covers it */ });
+    // FLASH 1 — flash, then under its peak cut from the splash to the transition
+    // video (played from the start).
+    flash(() => {
+      if (ss) ss.hidden = true;
+      tr.hidden = false;
+      vid.muted = true;
+      try { vid.currentTime = 0; } catch { /* metadata may not be ready; harmless */ }
+      const p = vid.play();
+      if (p && typeof p.catch === "function") p.catch(() => { /* blocked → safety net covers it */ });
+    });
 
     // safety net: if 'ended' never fires (decode stall / blocked play), force-finish
-    const durMs = (vid.duration && isFinite(vid.duration) ? vid.duration : 8.5) * 1000 + 1500;
+    const durMs = (vid.duration && isFinite(vid.duration) ? vid.duration : 8.5) * 1000 + 1800;
     setTimeout(finish, durMs);
   }
 
@@ -425,14 +440,16 @@ export function boot(): () => void {
     if (!ss) return;
     stopAuto();                           // don't leave auto-spin running behind the splash
     const tr = document.getElementById("transition");
-    if (tr) { tr.hidden = true; tr.classList.remove("show", "out"); }
-    const game = document.getElementById("game");
-    if (game) game.classList.remove("reveal-in");
+    if (tr) tr.hidden = true;
     ss.classList.remove("hide");
     ss.hidden = false;
     splashGone = false;                   // re-arm START (click / Space / Enter)
-    const bg = ss.querySelector("video.start-bg") as HTMLVideoElement | null;
-    if (bg) { bg.muted = true; bg.play().catch(() => { /* autoplay may defer */ }); }
+    // resume whichever splash clip is currently shown — the startscreen2 loop if
+    // the intro already finished, otherwise the intro itself
+    const intro = document.getElementById("startBg1") as HTMLVideoElement | null;
+    const loop = document.getElementById("startBg2") as HTMLVideoElement | null;
+    if (loop && loop.classList.contains("show")) { loop.muted = true; loop.play().catch(() => { /* defer */ }); }
+    else if (intro) { intro.muted = true; intro.play().catch(() => { /* defer */ }); }
     beep(420, 0.08, "square", 0.04);      // soft back blip
   }
 

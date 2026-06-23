@@ -158,7 +158,9 @@ export default function Game() {
 
       {/* ===================== START / SPLASH SCREEN ===================== */}
       <div className="start-screen" id="startScreen">
-        <video className="start-bg" src="/assets/start_screen.mp4" autoPlay muted loop playsInline aria-hidden="true" />
+        {/* the intro plays once, then crossfades to the looping startscreen2 */}
+        <video className="start-bg show" id="startBg1" src="/assets/start_screen.mp4" muted playsInline preload="auto" aria-hidden="true" />
+        <video className="start-bg" id="startBg2" src="/assets/startscreen2.mp4" muted loop playsInline preload="auto" aria-hidden="true" />
         <div className="start-inner">
           <img className="start-logo" src="/assets/logo.png" alt="Aether Dynasty" draggable={false} />
           <button className="start-btn loading" id="btnStart" type="button" disabled aria-busy="true">
@@ -172,6 +174,9 @@ export default function Game() {
         <video className="transition-vid" id="transitionVid" src="/assets/transition.mp4"
           muted playsInline preload="auto" aria-hidden="true" />
       </div>
+
+      {/* white flash that masks each hard cut (splash→transition, transition→game) */}
+      <div className="flash" id="flash" aria-hidden="true" />
     </>
   );
 }
