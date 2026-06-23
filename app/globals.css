@@ -40,10 +40,14 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   container-type:size;
   container-name:stage;
   display:flex;flex-direction:column;
-  background:
-    url('/assets/background.gif') center/cover no-repeat #0a0510;
+  background:#0a0510;
   overflow:hidden;
 }
+/* hardware-decoded background video (was background.gif — ~6× smaller, smooth).
+   Sits at the very back: container-type on .screen makes it a stacking context,
+   so z-index:-1 paints above the solid fill but below the stone floor + content. */
+.screen-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  z-index:-1;pointer-events:none;}
 .screen::before{ /* stone floor — fades smoothly upward, no hard cutoff */
   content:"";position:absolute;left:0;right:0;bottom:0;height:48%;
   background:linear-gradient(to top,
@@ -102,8 +106,11 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .logo img{height:clamp(62px,14.5cqh,184px);width:auto;display:block;
   filter:drop-shadow(0 0 18px #43e8ff77) drop-shadow(0 4px 12px #000b);}
 @keyframes logoFlick{0%,95%,100%{opacity:1;}96%{opacity:.78;}97%{opacity:1;}98.5%{opacity:.85;}}
-/* "How to play" button — dark pill so the gold content reads clearly */
-.icon-btn.info-btn{position:absolute;right:1.8cqw;top:50%;transform:translateY(-50%);
+/* top-right controls: HOME (back to splash) + "How to play", grouped to the right */
+.topbar-right{position:absolute;right:1.8cqw;top:50%;transform:translateY(-50%);
+  display:flex;align-items:center;gap:clamp(6px,.85cqw,12px);}
+/* shared dark-gold pill for the "How to play" + HOME buttons */
+.icon-btn.info-btn,.icon-btn.back-btn{
   display:flex;align-items:center;gap:.55em;
   width:auto;height:auto;border-radius:999px;
   padding:clamp(7px,1.15cqh,13px) clamp(13px,1.5cqw,22px);
@@ -111,15 +118,17 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   font-size:clamp(11px,1.45cqw,17px);font-weight:800;letter-spacing:1.6px;color:#ffe9b8;
   background:radial-gradient(120% 150% at 38% 18%, #16110a 0%, #0a0704 48%, #020101 100%);
   border:2px solid #ffd86a;
-  box-shadow:0 0 18px #43e8ffcc, 0 0 0 3px #00000099, 0 4px 14px #000a, inset 0 0 16px #00000099;
-  animation:infoPulse 2.4s ease-in-out infinite;}
-.icon-btn.info-btn:hover{
+  box-shadow:0 0 18px #43e8ffcc, 0 0 0 3px #00000099, 0 4px 14px #000a, inset 0 0 16px #00000099;}
+.icon-btn.info-btn{animation:infoPulse 2.4s ease-in-out infinite;}
+.icon-btn.info-btn:hover,.icon-btn.back-btn:hover{
   background:radial-gradient(120% 150% at 38% 18%, #241b0d 0%, #100a05 50%, #050302 100%);
   border-color:#ffe7a0;}
 .info-ico{width:1.95em;height:1.95em;flex:none;display:block;
   background:url("/assets/buttons/info.png") center/contain no-repeat;
   filter:drop-shadow(0 1px 2px #000a);}
-.info-txt{white-space:nowrap;line-height:1;text-shadow:0 0 8px #43e8ff55, 0 1px 2px #000;}
+.back-ico{width:1.55em;height:1.55em;flex:none;display:block;color:#ffe9b8;
+  filter:drop-shadow(0 1px 2px #000a);}
+.info-txt,.back-txt{white-space:nowrap;line-height:1;text-shadow:0 0 8px #43e8ff55, 0 1px 2px #000;}
 @keyframes infoPulse{0%,100%{box-shadow:0 0 14px #43e8ff99,0 0 0 3px #00000099,0 4px 14px #000a,inset 0 0 16px #00000099;}
   50%{box-shadow:0 0 28px #43e8ff,0 0 0 3px #00000099,0 4px 14px #000a,inset 0 0 16px #00000099;}}
 
@@ -528,9 +537,11 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
    ÆTHER DYNASTY logo at the top and the START button near the bottom — matching
    the reference composition. Sits above the game (z 100, over modals at 50 and
    the feature overlay at 60) and fades out on Start to reveal the game. */
-.start-screen{position:fixed;inset:0;z-index:100;
-  background:url('/assets/start_screen.gif') center/cover no-repeat #0a0510;
+.start-screen{position:fixed;inset:0;z-index:100;background:#0a0510;
   animation:fade .4s ease;}
+/* splash background video (was start_screen.gif) — loops behind the logo/button */
+.start-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  z-index:0;pointer-events:none;}
 .start-screen.hide{animation:startOut .55s ease forwards;pointer-events:none;}
 @keyframes startOut{to{opacity:0;transform:scale(1.04);}}
 
@@ -575,29 +586,24 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 @keyframes startSpin{to{transform:rotate(360deg);}}
 
 /* ---- start → game transition --------------------------------------------- *
-   On START we play transition.gif full-screen above everything (z 110, over the
-   splash at 100), then crossfade: the transition fades out while the game screen
-   — with its normal background.gif — fades in beneath it. Everything animates
-   on opacity/transform only (GPU-composited) with eased curves for smoothness. */
+   On START we play transition.mp4 full-screen above everything (z 110, over the
+   splash at 100). It plays in full; near its end the game screen fades in, and
+   on 'ended' the transition fades out — a clean crossfade onto the portal climax.
+   Hardware-decoded video, so it's smooth and light (no giant-GIF repaint). */
 .transition-fx{position:fixed;inset:0;z-index:110;background:#0a0510;
-  opacity:0;transition:opacity .45s cubic-bezier(.4,0,.2,1);
-  will-change:opacity;backface-visibility:hidden;}
+  opacity:0;transition:opacity .45s cubic-bezier(.4,0,.2,1);will-change:opacity;}
 .transition-fx.show{opacity:1;}
 .transition-fx.out{opacity:0;transition:opacity .9s cubic-bezier(.4,0,.2,1);}
-.transition-gif{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;
-  transform-origin:center;will-change:transform;backface-visibility:hidden;
-  animation:trZoom 6.5s cubic-bezier(.33,0,.2,1) both;}   /* slow push toward the portal */
-@keyframes trZoom{from{transform:scale(1);}to{transform:scale(1.05);}}
+.transition-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;}
 
 /* the game screen materialises — fades in with a gentle settle as the transition lifts */
-#game.reveal-in{animation:gameReveal .9s cubic-bezier(.22,1,.36,1) both;
-  will-change:opacity,transform;backface-visibility:hidden;}
+#game.reveal-in{animation:gameReveal .9s cubic-bezier(.22,1,.36,1) both;will-change:opacity;}
 @keyframes gameReveal{from{opacity:0;transform:scale(1.012);}to{opacity:1;transform:scale(1);}}
 @keyframes gameRevealRM{from{opacity:0;}to{opacity:1;}}   /* reduced-motion: opacity only */
 
-/* respect reduced-motion: keep a quick crossfade but drop looping/zoom flourishes */
+/* respect reduced-motion: keep a quick crossfade but drop looping flourishes */
 @media (prefers-reduced-motion: reduce){
-  .start-logo,.start-btn,.transition-gif{animation:none;}
+  .start-logo,.start-btn{animation:none;}
   .transition-fx,.transition-fx.out{transition-duration:.4s;}
   #game.reveal-in{animation:gameRevealRM .45s ease both;}
 }
@@ -621,10 +627,12 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
      "HOW TO PLAY" caption), kept clear of the logo so they never overlap */
   .topbar{padding:max(6px,1.6vmin) 3vw 0;}
   .logo img{height:clamp(44px,min(10cqh,18vmin),104px);max-width:48vw;}
-  .icon-btn.info-btn{right:2.5vw;flex-direction:column;gap:3px;
+  .topbar-right{right:2.5vw;gap:2vw;}
+  .icon-btn.info-btn,.icon-btn.back-btn{flex-direction:column;gap:3px;
     padding:6px 8px;font-size:9px;letter-spacing:.4px;line-height:1.08;}
   .info-ico{width:clamp(19px,5vmin,26px);height:clamp(19px,5vmin,26px);}
-  .info-txt{white-space:normal;text-align:center;max-width:5.5em;}
+  .back-ico{width:clamp(17px,4.6vmin,24px);height:clamp(17px,4.6vmin,24px);}
+  .info-txt,.back-txt{white-space:normal;text-align:center;max-width:5.5em;}
 
   /* free-game banner shrinks so it can't overflow a narrow screen */
   .free-banner{gap:2.5vw;padding:5px 3vw;font-size:clamp(11px,3vmin,15px);}
@@ -690,7 +698,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 @media (orientation:landscape) and (max-height:520px){
   .topbar{padding:1vmin 2cqw 0;}
   .logo img{height:clamp(38px,11cqh,90px);}
-  .icon-btn.info-btn{padding:5px 10px;font-size:11px;}
+  .icon-btn.info-btn,.icon-btn.back-btn{padding:5px 10px;font-size:11px;}
   /* give back vertical room: smaller board + tighter HUD, drop the hint line */
   .board{--board-size:clamp(120px,min(44cqh,70cqw),520px);}
   .hud{margin-bottom:clamp(6px,1.6cqh,18px);gap:1.4cqw;}

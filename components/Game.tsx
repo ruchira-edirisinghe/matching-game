@@ -23,6 +23,9 @@ export default function Game() {
         {/* ===================== GAME SCREEN ===================== */}
         <div id="game" className="screen">
 
+          {/* hardware-decoded background (was background.gif) */}
+          <video className="screen-bg" src="/assets/background.mp4" autoPlay muted loop playsInline aria-hidden="true" />
+
           {/* futuristic background layer */}
           <div className="bg-grid" />
           <div className="rune-ring" id="runeRing" />
@@ -32,10 +35,19 @@ export default function Game() {
             <div className="logo">
               <img src="/assets/logo.png" alt="Aether Dynasty" draggable={false} />
             </div>
-            <button className="icon-btn info-btn" id="btnRules" title="How to play" aria-label="How to play">
-              <span className="info-ico" />
-              <span className="info-txt">How to Play</span>
-            </button>
+            <div className="topbar-right">
+              <button className="icon-btn info-btn" id="btnRules" title="How to play" aria-label="How to play">
+                <span className="info-ico" />
+                <span className="info-txt">How to Play</span>
+              </button>
+              <button className="icon-btn back-btn" id="btnHome" title="Back to home" aria-label="Back to home screen">
+                <svg className="back-ico" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 11.5 12 4l9 7.5M5.5 10v9.5h4.5v-5.5h4v5.5h4.5V10" fill="none"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="back-txt">Home</span>
+              </button>
+            </div>
           </header>
 
           {/* free game banner */}
@@ -146,6 +158,7 @@ export default function Game() {
 
       {/* ===================== START / SPLASH SCREEN ===================== */}
       <div className="start-screen" id="startScreen">
+        <video className="start-bg" src="/assets/start_screen.mp4" autoPlay muted loop playsInline aria-hidden="true" />
         <div className="start-inner">
           <img className="start-logo" src="/assets/logo.png" alt="Aether Dynasty" draggable={false} />
           <button className="start-btn loading" id="btnStart" type="button" disabled aria-busy="true">
@@ -156,7 +169,8 @@ export default function Game() {
 
       {/* ============ START → GAME TRANSITION (portal sting) ============ */}
       <div className="transition-fx" id="transition" hidden>
-        <img className="transition-gif" id="transitionGif" alt="" aria-hidden="true" draggable={false} />
+        <video className="transition-vid" id="transitionVid" src="/assets/transition.mp4"
+          muted playsInline preload="auto" aria-hidden="true" />
       </div>
     </>
   );

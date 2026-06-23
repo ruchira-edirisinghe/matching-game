@@ -120,11 +120,15 @@ export function boot(): () => void {
 
     // Warm the cascade break-frame GIF so it's cached before the first break
     // animation (replaces the <link rel=preload> the browser flagged as unused).
-    // Also warm the START → game transition GIF so it plays instantly on click.
-    if (typeof Image !== "undefined") {
-      new Image().src = "/assets/cell-break.gif";
-      new Image().src = "/assets/transition.gif";
-    }
+    if (typeof Image !== "undefined") { new Image().src = "/assets/cell-break.gif"; }
+
+    // Background/transition videos: force-mute (React doesn't reliably reflect
+    // the `muted` attribute) so autoplay is allowed, then start the looping
+    // backgrounds. The portal transition is preloaded via its markup.
+    document.querySelectorAll<HTMLVideoElement>("video.start-bg, video.screen-bg, #transitionVid")
+      .forEach((v) => { v.muted = true; });
+    document.querySelectorAll<HTMLVideoElement>("video.start-bg, video.screen-bg")
+      .forEach((v) => { v.play().catch(() => { /* autoplay may defer; harmless */ }); });
 
     // decorative art
     $("runeRing").innerHTML = S.art.techRune();
@@ -351,9 +355,9 @@ export function boot(): () => void {
 
   // Reveal the game on Start. Ignored until the game is ready, and fires exactly
   // once (Start click, Space, and Enter all funnel through here). The sequence:
-  // play the portal transition GIF full-screen, then crossfade — the transition
-  // fades out while the game screen (with its normal background GIF) fades in.
-  const TRANSITION_HOLD = 2600;   // ms the transition plays before the game fades in (tunable)
+  // play the portal transition video IN FULL, fade the game in during its final
+  // stretch, then fade the transition out exactly when the clip ends — a clean
+  // crossfade that lands on the portal climax.
   function dismissStart(): void {
     if (!gameReady || splashGone) return;
     splashGone = true;
@@ -361,45 +365,75 @@ export function boot(): () => void {
 
     const ss = document.getElementById("startScreen");
     const tr = document.getElementById("transition");
-    const trGif = document.getElementById("transitionGif") as HTMLImageElement | null;
+    const vid = document.getElementById("transitionVid") as HTMLVideoElement | null;
     const game = document.getElementById("game");
 
     // Fallback: if the transition layer isn't present, just fade the splash out.
-    if (!tr || !trGif || !game) {
+    if (!tr || !vid || !game) {
       if (ss) { ss.classList.add("hide"); setTimeout(() => { ss.hidden = true; }, 600); }
       return;
     }
 
-    const runTransition = (): void => {
-      // 1) play the transition GIF on top of everything, fading it in over the
-      //    splash (frame 0 ≈ the splash art, so the hand-off is seamless).
-      tr.hidden = false;
-      void tr.offsetWidth;             // reflow so the .show opacity transition runs
-      tr.classList.add("show");
-
-      // 2) once the GIF covers the screen, drop the splash underneath it
-      setTimeout(() => { if (ss) ss.hidden = true; }, 500);
-
-      // 3) crossfade. Start the game fading in first, then lift the transition a
-      //    beat later — by the time it thins, the game is already most of the way
-      //    in, so there's no dark gap and the reveal stays smooth.
-      setTimeout(() => { game.classList.add("reveal-in"); }, TRANSITION_HOLD);
-      setTimeout(() => { tr.classList.add("out"); }, TRANSITION_HOLD + 300);
-
-      // 4) tidy up after the crossfade — remove the transition layer + temp class
+    let finished = false;
+    // Start fading the game in during the clip's final ~0.85s so the crossfade
+    // overlaps the climax.
+    const onTime = (): void => {
+      if (vid.duration && vid.currentTime >= vid.duration - 0.85) {
+        game.classList.add("reveal-in");
+        vid.removeEventListener("timeupdate", onTime);
+      }
+    };
+    // Finish when the clip ends (or via the safety net): lift the transition off
+    // the now-revealed game. Detaches its own listeners so the Home → Start
+    // round-trip re-arms cleanly without stacking handlers.
+    const finish = (): void => {
+      if (finished) return;
+      finished = true;
+      vid.removeEventListener("timeupdate", onTime);
+      vid.removeEventListener("ended", finish);
+      game.classList.add("reveal-in");   // ensure the game is fading/faded in
+      tr.classList.add("out");           // lift the transition off it
       setTimeout(() => {
         tr.hidden = true;
         tr.classList.remove("show", "out");
-        trGif.removeAttribute("src");  // free the decoded frames
         game.classList.remove("reveal-in");
-      }, TRANSITION_HOLD + 1400);
+        try { vid.pause(); } catch { /* ignore */ }
+      }, 1000);
     };
+    vid.addEventListener("timeupdate", onTime, { signal });
+    vid.addEventListener("ended", finish, { signal });
 
-    // Decode the (warmed, cached) GIF before showing so its first frame paints
-    // instantly — no dark flash during the fade-in. Falls back to showing now.
-    trGif.src = "/assets/transition.gif";
-    if (typeof trGif.decode === "function") trGif.decode().then(runTransition, runTransition);
-    else runTransition();
+    // show the transition over the splash, drop the splash beneath it, play from 0
+    tr.hidden = false;
+    void tr.offsetWidth;                 // reflow so the .show opacity transition runs
+    tr.classList.add("show");
+    setTimeout(() => { if (ss) ss.hidden = true; }, 500);
+    try { vid.currentTime = 0; } catch { /* metadata may not be ready; harmless */ }
+    const p = vid.play();
+    if (p && typeof p.catch === "function") p.catch(() => { /* blocked → safety net covers it */ });
+
+    // safety net: if 'ended' never fires (decode stall / blocked play), force-finish
+    const durMs = (vid.duration && isFinite(vid.duration) ? vid.duration : 8.5) * 1000 + 1500;
+    setTimeout(finish, durMs);
+  }
+
+  // Back-to-home button: bring the splash back over the running game and re-arm
+  // START. The game keeps its state underneath; pressing START plays the portal
+  // transition again and reveals it.
+  function goHome(): void {
+    const ss = document.getElementById("startScreen");
+    if (!ss) return;
+    stopAuto();                           // don't leave auto-spin running behind the splash
+    const tr = document.getElementById("transition");
+    if (tr) { tr.hidden = true; tr.classList.remove("show", "out"); }
+    const game = document.getElementById("game");
+    if (game) game.classList.remove("reveal-in");
+    ss.classList.remove("hide");
+    ss.hidden = false;
+    splashGone = false;                   // re-arm START (click / Space / Enter)
+    const bg = ss.querySelector("video.start-bg") as HTMLVideoElement | null;
+    if (bg) { bg.muted = true; bg.play().catch(() => { /* autoplay may defer */ }); }
+    beep(420, 0.08, "square", 0.04);      // soft back blip
   }
 
   async function preSpin(): Promise<void> {
@@ -693,6 +727,9 @@ export function boot(): () => void {
       }
     };
     document.addEventListener("keydown", onStartKey, { signal });
+
+    // back-to-home button (top-right) — re-show the splash over the game
+    $("btnHome").addEventListener("click", goHome, { signal });
 
     btnSpin.addEventListener("click", handleSpinPress, { signal });
 
