@@ -38,6 +38,9 @@ export default function RootLayout({
             GIF isn't needed until a spin's cascade plays.) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* Single-route app — these fonts do load for every (one) page, so the
+            page-custom-font caveat doesn't apply here. */}
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
           href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Marcellus+SC&family=Spectral:wght@400;500;700&display=swap"
           rel="stylesheet"

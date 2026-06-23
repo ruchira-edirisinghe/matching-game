@@ -55,8 +55,9 @@ export function boot(): () => void {
   let currentBoard: Board = [], currentHeights: Heights = [];
   let spinning = false, skip = false;
   let turbo = 0;                 // 0 = off, 1 = turbo, 2 = super turbo
-  let soundOn = true;
-  let bgMusic: HTMLAudioElement | null = null;   // looping background track (50% volume)
+  let musicVolume = 0.35;        // background-music level (0–1), set in the Sound popup
+  let sfxVolume = 1.0;           // game-effects level (0–1), set in the Sound popup
+  let bgMusic: HTMLAudioElement | null = null;   // looping background track
   let autoRemaining = 0, autoInfinite = false;
   let autoSelected: number | "inf" = 10;
   let shownBalance = engine.balance;
@@ -132,20 +133,19 @@ export function boot(): () => void {
       .forEach((v) => { v.play().catch(() => { /* autoplay may defer; harmless */ }); });
     setupSplashBg();
 
-    // Background music — looping, 50% volume. Audio can't autoplay, so try now
-    // and otherwise start on the first user gesture (then stop retrying).
+    // Background music — looping at the music volume (default 35%). Browsers
+    // block audio autoplay until a gesture, so we try immediately and again on
+    // the first interaction of any kind (mouse move/tap/key) so it starts as
+    // soon as the player touches the start screen, then stop retrying.
     bgMusic = document.getElementById("bgMusic") as HTMLAudioElement | null;
-    if (bgMusic) { bgMusic.loop = true; bgMusic.volume = 0.5; }
+    if (bgMusic) { bgMusic.loop = true; bgMusic.volume = musicVolume; }
     startMusic();
+    const kickEvents = ["pointerdown", "pointermove", "keydown", "touchstart", "click"];
     const kickMusic = (): void => {
       startMusic();
-      if (bgMusic && !bgMusic.paused) {
-        document.removeEventListener("pointerdown", kickMusic);
-        document.removeEventListener("keydown", kickMusic);
-      }
+      if (bgMusic && !bgMusic.paused) kickEvents.forEach((ev) => document.removeEventListener(ev, kickMusic));
     };
-    document.addEventListener("pointerdown", kickMusic, { signal });
-    document.addEventListener("keydown", kickMusic, { signal });
+    kickEvents.forEach((ev) => document.addEventListener(ev, kickMusic, { signal, passive: true }));
 
     // decorative art
     $("runeRing").innerHTML = S.art.techRune();
@@ -312,7 +312,7 @@ export function boot(): () => void {
   // =============================================================================
   let actx: AudioContext | null = null;
   function beep(freq: number, dur: number, type?: OscillatorType, vol?: number): void {
-    if (!soundOn) return;
+    if (sfxVolume <= 0) return;
     try {
       actx = actx || new (window.AudioContext || window.webkitAudioContext!)();
       // Browsers start the context suspended until a user gesture; resume it so
@@ -320,7 +320,7 @@ export function boot(): () => void {
       if (actx.state === "suspended") actx.resume().catch(() => { /* ignore */ });
       const o = actx.createOscillator(), g = actx.createGain();
       o.type = type || "triangle"; o.frequency.value = freq;
-      g.gain.value = vol || 0.05;
+      g.gain.value = (vol || 0.05) * sfxVolume;
       o.connect(g); g.connect(actx.destination);
       const t = actx.currentTime;
       g.gain.setValueAtTime(g.gain.value, t);
@@ -333,12 +333,12 @@ export function boot(): () => void {
   const sndDrop = (): void => beep(120, 0.08, "square", 0.03);
   const sndBig = (): void => { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.25, "triangle", 0.07), i * 90)); };
 
-  // Background music: looping mp3 held at 50% volume, gated by the sound toggle.
-  // Browsers block audio autoplay until a user gesture, so init() also retries
-  // this on the first interaction (see setupMusic).
+  // Background music: looping mp3 at the current music volume (default 35%, set
+  // in the Sound popup). Browsers block audio autoplay until a user gesture, so
+  // init() also kicks this off on the first interaction with the start screen.
   function startMusic(): void {
-    if (!bgMusic || !soundOn) return;
-    bgMusic.volume = 0.5;
+    if (!bgMusic || musicVolume <= 0) return;
+    bgMusic.volume = musicVolume;
     bgMusic.play().catch(() => { /* needs a user gesture; retried on first interaction */ });
   }
 
@@ -383,7 +383,7 @@ export function boot(): () => void {
       loop.classList.add("show");
       const hideIntro = (): void => { intro.classList.remove("show"); try { intro.pause(); } catch { /* ignore */ } };
       if (loop.readyState >= 2) hideIntro();
-      else loop.addEventListener("playing", hideIntro, { once: true });
+      else loop.addEventListener("playing", hideIntro, { once: true, signal });
     };
     intro.addEventListener("ended", toLoop, { signal });
   }
@@ -396,8 +396,8 @@ export function boot(): () => void {
     fl.classList.remove("go");
     void fl.offsetWidth;                  // restart the animation if it's mid-flight
     fl.classList.add("go");
-    if (atPeak) setTimeout(atPeak, 180);  // ~ the peak (24% of the .72s flash)
-    setTimeout(() => fl.classList.remove("go"), 760);
+    if (atPeak) setTimeout(atPeak, 250);  // during the held peak (≈25% of the 1s flash)
+    setTimeout(() => fl.classList.remove("go"), 1050);
   }
 
   // Swap the START button out of its "Loading…" state once the game is ready.
@@ -431,29 +431,31 @@ export function boot(): () => void {
     if (!tr || !vid || !game) { if (ss) ss.hidden = true; return; }
 
     let finished = false;
-    // FLASH 2 — when the clip ends (or the safety net fires), flash and cut to
-    // the game (race) screen. Detaches its own listener so the Home → Start
-    // round-trip re-arms cleanly without stacking handlers.
+    // FLASH 2 — when the clip ends (or the safety net fires), a flash masks a
+    // smooth fade from the transition to the game (race) screen. Detaches its
+    // own listener so the Home → Start round-trip re-arms without stacking.
     const finish = (): void => {
       if (finished) return;
       finished = true;
       vid.removeEventListener("ended", finish);
       flash(() => {
-        tr.hidden = true;                // hidden under the flash → reveals the game
-        try { vid.pause(); vid.currentTime = 0; } catch { /* ignore */ }
+        tr.classList.remove("show");     // fade the transition out → game shows beneath
+        setTimeout(() => { tr.hidden = true; try { vid.pause(); vid.currentTime = 0; } catch { /* ignore */ } }, 450);
       });
     };
     vid.addEventListener("ended", finish, { signal });
 
-    // FLASH 1 — flash, then under its peak cut from the splash to the transition
+    // FLASH 1 — a flash masks a smooth fade from the splash to the transition
     // video (played from the start).
     flash(() => {
-      if (ss) ss.hidden = true;
       tr.hidden = false;
+      void tr.offsetWidth;               // reflow so the fade-in transition runs
+      tr.classList.add("show");          // fade the transition in over the splash
       vid.muted = true;
       try { vid.currentTime = 0; } catch { /* metadata may not be ready; harmless */ }
       const p = vid.play();
       if (p && typeof p.catch === "function") p.catch(() => { /* blocked → safety net covers it */ });
+      setTimeout(() => { if (ss) ss.hidden = true; }, 450);   // drop the splash once the transition has faded in
     });
 
     // safety net: if 'ended' never fires (decode stall / blocked play), force-finish
@@ -761,9 +763,9 @@ export function boot(): () => void {
   // Controls
   // =============================================================================
   function wireControls(): void {
-    // start / splash screen — Start (click) or Space/Enter fades it out to
-    // reveal the game beneath. dismissStart() ignores input until the game is
-    // ready (see markReady) and only fires once.
+    // start / splash screen — Start (click) or Space/Enter plays the portal
+    // transition to reveal the game. dismissStart() ignores input until the game
+    // is ready (see markReady) and only fires once.
     $("btnStart").addEventListener("click", dismissStart, { signal });
     const onStartKey = (e: KeyboardEvent) => {
       if ($("startScreen").hidden) return;   // splash already gone
@@ -774,7 +776,7 @@ export function boot(): () => void {
     };
     document.addEventListener("keydown", onStartKey, { signal });
 
-    // back-to-home button (top-right) — re-show the splash over the game
+    // back-to-home button (top-left) — re-show the splash over the game
     $("btnHome").addEventListener("click", goHome, { signal });
 
     btnSpin.addEventListener("click", handleSpinPress, { signal });
@@ -789,7 +791,7 @@ export function boot(): () => void {
       // would fast-forward the overlay and any free games that follow it.
       if (!$("overlay").hidden) return;
       // don't spin behind an open modal
-      if (!$("rulesModal").hidden || !$("autoModal").hidden || !$("historyModal").hidden) return;
+      if (!$("rulesModal").hidden || !$("autoModal").hidden || !$("historyModal").hidden || !$("soundModal").hidden) return;
       handleSpinPress();
     };
     document.addEventListener("keydown", onSpaceKey, { signal });
@@ -809,14 +811,36 @@ export function boot(): () => void {
       $("autoModal").hidden = false;
     }, { signal });
 
-    $("btnSound").addEventListener("click", () => { soundOn = !soundOn; $("btnSound").classList.toggle("muted", !soundOn); $("btnSound").innerHTML = soundOn ? "&#128266;" : "&#128263;"; if (soundOn) startMusic(); else if (bgMusic) bgMusic.pause(); }, { signal });
+    // sound button → open the volume popup (Music + Effects sliders)
+    const fmtPct = (v: number): string => Math.round(v * 100) + "%";
+    $("btnSound").addEventListener("click", () => {
+      ($("musicVol") as HTMLInputElement).value = String(Math.round(musicVolume * 100));
+      ($("sfxVol") as HTMLInputElement).value = String(Math.round(sfxVolume * 100));
+      $("musicVolVal").textContent = fmtPct(musicVolume);
+      $("sfxVolVal").textContent = fmtPct(sfxVolume);
+      $("soundModal").hidden = false;
+    }, { signal });
+    $("musicVol").addEventListener("input", (e) => {
+      musicVolume = (+(e.target as HTMLInputElement).value) / 100;
+      $("musicVolVal").textContent = fmtPct(musicVolume);
+      $("btnSound").classList.toggle("muted", musicVolume === 0);
+      if (bgMusic) bgMusic.volume = musicVolume;
+      if (musicVolume > 0) startMusic(); else if (bgMusic) bgMusic.pause();
+    }, { signal });
+    $("sfxVol").addEventListener("input", (e) => {
+      sfxVolume = (+(e.target as HTMLInputElement).value) / 100;
+      $("sfxVolVal").textContent = fmtPct(sfxVolume);
+      beep(620, 0.08, "triangle", 0.06);   // sample blip so the level is audible
+    }, { signal });
+    $("soundClose").addEventListener("click", () => { $("soundModal").hidden = true; }, { signal });
+    $("soundModal").addEventListener("click", (e) => { if (e.target === $("soundModal")) $("soundModal").hidden = true; }, { signal });
     $("btnHistory").addEventListener("click", () => { renderHistory(); $("historyModal").hidden = false; }, { signal });
     $("historyClose").addEventListener("click", () => { $("historyModal").hidden = true; }, { signal });
     $("historyModal").addEventListener("click", (e) => { if (e.target === $("historyModal")) $("historyModal").hidden = true; }, { signal });
 
     // Esc closes whichever modal is open
     const onEscKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") ["historyModal", "rulesModal", "autoModal"].forEach((id) => { if (!$(id).hidden) $(id).hidden = true; });
+      if (e.key === "Escape") ["historyModal", "rulesModal", "autoModal", "soundModal"].forEach((id) => { if (!$(id).hidden) $(id).hidden = true; });
     };
     document.addEventListener("keydown", onEscKey, { signal });
 

@@ -17,8 +17,8 @@ export default function Game() {
 
   return (
     <>
-      {/* looping background music (started on first user gesture, 50% volume) */}
-      <audio id="bgMusic" src="/assets/Music.mp3" loop preload="auto" aria-hidden="true" />
+      {/* looping background music (35% by default; starts on first interaction) */}
+      <audio id="bgMusic" src="/assets/Music.mp3" loop autoPlay preload="auto" aria-hidden="true" />
 
       <div id="filter-defs" />
 
@@ -36,6 +36,8 @@ export default function Game() {
           {/* top bar */}
           <header className="topbar">
             <div className="logo">
+              {/* CSS-clamp-sized decorative logo — next/image's intrinsic sizing doesn't fit */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/assets/logo.png" alt="Aether Dynasty" draggable={false} />
             </div>
             <div className="topbar-left">
@@ -156,6 +158,26 @@ export default function Game() {
         </div>
       </div>
 
+      {/* ===================== SOUND SETTINGS MODAL ===================== */}
+      <div className="modal" id="soundModal" hidden>
+        <div className="modal-card small-card">
+          <button className="modal-close" id="soundClose" aria-label="Close">&times;</button>
+          <h2 className="modal-title">Sound</h2>
+          <div className="sound-settings">
+            <div className="sound-row">
+              <span className="sound-label">Music</span>
+              <input className="sound-slider" type="range" id="musicVol" min="0" max="100" step="1" defaultValue={35} aria-label="Music volume" />
+              <span className="sound-val" id="musicVolVal">35%</span>
+            </div>
+            <div className="sound-row">
+              <span className="sound-label">Effects</span>
+              <input className="sound-slider" type="range" id="sfxVol" min="0" max="100" step="1" defaultValue={100} aria-label="Game effects volume" />
+              <span className="sound-val" id="sfxVolVal">100%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ===================== FEATURE OVERLAY ===================== */}
       <div className="overlay" id="overlay" hidden>
         <div className="overlay-inner" id="overlayInner" />
@@ -163,10 +185,11 @@ export default function Game() {
 
       {/* ===================== START / SPLASH SCREEN ===================== */}
       <div className="start-screen" id="startScreen">
-        {/* the intro plays once, then crossfades to the looping startscreen2 */}
+        {/* the intro plays once, then swaps instantly to the looping startscreen2 */}
         <video className="start-bg show" id="startBg1" src="/assets/start_screen.mp4" muted playsInline preload="auto" aria-hidden="true" />
         <video className="start-bg" id="startBg2" src="/assets/startscreen2.mp4" muted loop playsInline preload="auto" aria-hidden="true" />
         <div className="start-inner">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="start-logo" src="/assets/logo.png" alt="Aether Dynasty" draggable={false} />
           <button className="start-btn loading" id="btnStart" type="button" disabled aria-busy="true">
             <span className="start-btn-txt">Loading&hellip;</span>

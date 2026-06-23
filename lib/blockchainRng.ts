@@ -80,10 +80,10 @@ export function fetchBlockchainSeed(signal?: AbortSignal): Promise<BlockchainSee
           let data: { number?: number; blockNumber?: number; blockHash?: string; errorMessage?: string; status?: number } | null = null;
           try { data = text ? JSON.parse(text) : null; } catch { data = null; }
 
-          // Success — a numeric seed was returned.
+          // Success — a numeric seed was returned. (Seed details stay inspectable
+          // via window.GT.seedInfo(); no per-fetch console logging in production.)
           if (data && data.number !== undefined && data.number !== null) {
             __rngLagSec = lag; // remember the working offset for next time
-            console.log(`[BlockchainRNG] ✅ Seed — block #${data.blockNumber} number=${data.number} (lag ${lag}s)`);
             finish({ seed: data.number / 99999, number: data.number, blockNumber: data.blockNumber ?? null, blockHash: data.blockHash ?? null, fallback: false });
             return;
           }
