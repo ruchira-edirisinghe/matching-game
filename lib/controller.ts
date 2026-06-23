@@ -56,6 +56,7 @@ export function boot(): () => void {
   let spinning = false, skip = false;
   let turbo = 0;                 // 0 = off, 1 = turbo, 2 = super turbo
   let soundOn = true;
+  let bgMusic: HTMLAudioElement | null = null;   // looping background track (50% volume)
   let autoRemaining = 0, autoInfinite = false;
   let autoSelected: number | "inf" = 10;
   let shownBalance = engine.balance;
@@ -130,6 +131,21 @@ export function boot(): () => void {
     document.querySelectorAll<HTMLVideoElement>("video.screen-bg")
       .forEach((v) => { v.play().catch(() => { /* autoplay may defer; harmless */ }); });
     setupSplashBg();
+
+    // Background music — looping, 50% volume. Audio can't autoplay, so try now
+    // and otherwise start on the first user gesture (then stop retrying).
+    bgMusic = document.getElementById("bgMusic") as HTMLAudioElement | null;
+    if (bgMusic) { bgMusic.loop = true; bgMusic.volume = 0.5; }
+    startMusic();
+    const kickMusic = (): void => {
+      startMusic();
+      if (bgMusic && !bgMusic.paused) {
+        document.removeEventListener("pointerdown", kickMusic);
+        document.removeEventListener("keydown", kickMusic);
+      }
+    };
+    document.addEventListener("pointerdown", kickMusic, { signal });
+    document.addEventListener("keydown", kickMusic, { signal });
 
     // decorative art
     $("runeRing").innerHTML = S.art.techRune();
@@ -317,6 +333,15 @@ export function boot(): () => void {
   const sndDrop = (): void => beep(120, 0.08, "square", 0.03);
   const sndBig = (): void => { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.25, "triangle", 0.07), i * 90)); };
 
+  // Background music: looping mp3 held at 50% volume, gated by the sound toggle.
+  // Browsers block audio autoplay until a user gesture, so init() also retries
+  // this on the first interaction (see setupMusic).
+  function startMusic(): void {
+    if (!bgMusic || !soundOn) return;
+    bgMusic.volume = 0.5;
+    bgMusic.play().catch(() => { /* needs a user gesture; retried on first interaction */ });
+  }
+
   // =============================================================================
   // Spin flow
   // =============================================================================
@@ -350,11 +375,15 @@ export function boot(): () => void {
     intro.muted = true; loop.muted = true;
     intro.play().catch(() => { /* autoplay may defer; harmless */ });
     const toLoop = (): void => {
-      intro.classList.remove("show");     // fade the intro out…
-      loop.classList.add("show");         // …and the looping clip in
+      // Instant swap, no crossfade. The loop video stacks above the intro, so
+      // showing it from frame 0 covers the intro with no cut; we only hide the
+      // intro once the loop is actually rendering, so there's never a dark gap.
       try { loop.currentTime = 0; } catch { /* ignore */ }
       loop.play().catch(() => { /* ignore */ });
-      setTimeout(() => { try { intro.pause(); } catch { /* ignore */ } }, 700);
+      loop.classList.add("show");
+      const hideIntro = (): void => { intro.classList.remove("show"); try { intro.pause(); } catch { /* ignore */ } };
+      if (loop.readyState >= 2) hideIntro();
+      else loop.addEventListener("playing", hideIntro, { once: true });
     };
     intro.addEventListener("ended", toLoop, { signal });
   }
@@ -780,7 +809,7 @@ export function boot(): () => void {
       $("autoModal").hidden = false;
     }, { signal });
 
-    $("btnSound").addEventListener("click", () => { soundOn = !soundOn; $("btnSound").classList.toggle("muted", !soundOn); $("btnSound").innerHTML = soundOn ? "&#128266;" : "&#128263;"; }, { signal });
+    $("btnSound").addEventListener("click", () => { soundOn = !soundOn; $("btnSound").classList.toggle("muted", !soundOn); $("btnSound").innerHTML = soundOn ? "&#128266;" : "&#128263;"; if (soundOn) startMusic(); else if (bgMusic) bgMusic.pause(); }, { signal });
     $("btnHistory").addEventListener("click", () => { renderHistory(); $("historyModal").hidden = false; }, { signal });
     $("historyClose").addEventListener("click", () => { $("historyModal").hidden = true; }, { signal });
     $("historyModal").addEventListener("click", (e) => { if (e.target === $("historyModal")) $("historyModal").hidden = true; }, { signal });
@@ -908,6 +937,7 @@ export function boot(): () => void {
     // Release the audio context and drop the global debug hooks so a remount
     // (Fast Refresh) doesn't leave stale closures pointing at detached DOM.
     if (actx) { actx.close().catch(() => { /* ignore */ }); actx = null; }
+    if (bgMusic) { bgMusic.pause(); bgMusic = null; }
     delete window.GT;
     delete window.__showRulePage;
   };

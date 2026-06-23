@@ -17,6 +17,9 @@ export default function Game() {
 
   return (
     <>
+      {/* looping background music (started on first user gesture, 50% volume) */}
+      <audio id="bgMusic" src="/assets/Music.mp3" loop preload="auto" aria-hidden="true" />
+
       <div id="filter-defs" />
 
       <div id="stage">
@@ -35,17 +38,19 @@ export default function Game() {
             <div className="logo">
               <img src="/assets/logo.png" alt="Aether Dynasty" draggable={false} />
             </div>
-            <div className="topbar-right">
-              <button className="icon-btn info-btn" id="btnRules" title="How to play" aria-label="How to play">
-                <span className="info-ico" />
-                <span className="info-txt">How to Play</span>
-              </button>
+            <div className="topbar-left">
               <button className="icon-btn back-btn" id="btnHome" title="Back to home" aria-label="Back to home screen">
                 <svg className="back-ico" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M3 11.5 12 4l9 7.5M5.5 10v9.5h4.5v-5.5h4v5.5h4.5V10" fill="none"
                     stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 <span className="back-txt">Home</span>
+              </button>
+            </div>
+            <div className="topbar-right">
+              <button className="icon-btn info-btn" id="btnRules" title="How to play" aria-label="How to play">
+                <span className="info-ico" />
+                <span className="info-txt">How to Play</span>
               </button>
             </div>
           </header>
