@@ -26,8 +26,11 @@ export default function Game() {
         {/* ===================== GAME SCREEN ===================== */}
         <div id="game" className="screen">
 
-          {/* hardware-decoded background (was background.gif) */}
-          <video className="screen-bg" src="/assets/background.mp4" autoPlay muted loop playsInline aria-hidden="true" />
+          {/* hardware-decoded background (was background.gif). NOT autoPlay: the
+              controller starts it only when the game screen is shown, so it never
+              decodes behind the splash (one background video at a time = less
+              mobile-webview jank). */}
+          <video className="screen-bg" src="/assets/background.mp4" muted loop playsInline preload="auto" aria-hidden="true" />
 
           {/* futuristic background layer */}
           <div className="bg-grid" />
@@ -48,6 +51,14 @@ export default function Game() {
                 </svg>
                 <span className="back-txt">Home</span>
               </button>
+              {/* Player profile chip — avatar + name (populated imperatively by the
+                  controller via #playerAvatar / #playerName so React never re-renders
+                  over it; mirrors how the HUD readouts are managed). The name hides
+                  on narrow phones (avatar-only) so it never crowds the centre logo. */}
+              <div className="player-chip">
+                <div className="pc-avatar" id="playerAvatar" aria-hidden="true" />
+                <div className="pc-name" id="playerName" />
+              </div>
             </div>
             <div className="topbar-right">
               <button className="icon-btn info-btn" id="btnRules" title="How to play" aria-label="How to play">
@@ -71,7 +82,7 @@ export default function Game() {
               <div className="cascade-fx" id="cascadeFx" />
             </div>
             <div className="ways-bar">
-              <span className="ways-num" id="waysNum">4,096</span>
+              <span className="ways-num" id="waysNum" />
               <span className="ways-label">WAYS</span>
             </div>
             <div className="win-pop" id="winPop" />
@@ -81,21 +92,21 @@ export default function Game() {
           <footer className="hud">
             <div className="meter balance">
               <div className="meter-top"><span className="lvl">LV.0</span> Balance</div>
-              <div className="meter-val">Rs <span id="balVal">50,000.00</span></div>
+              <div className="meter-val">Rs <span id="balVal" /></div>
             </div>
 
             <div className="bet-block">
               <button className="round-btn small" id="betMinus" aria-label="Decrease bet">&minus;</button>
               <div className="bet-info">
                 <div className="bet-label">Bet</div>
-                <div className="bet-val">Rs <span id="betVal">3</span></div>
+                <div className="bet-val">Rs <span id="betVal" /></div>
               </div>
               <button className="round-btn small" id="betPlus" aria-label="Increase bet">+</button>
             </div>
 
             <div className="meter win">
               <div className="meter-top">WIN</div>
-              <div className="meter-val win-amount">Rs <span id="winVal">0.00</span></div>
+              <div className="meter-val win-amount">Rs <span id="winVal" /></div>
             </div>
 
             <div className="controls">
@@ -110,7 +121,7 @@ export default function Game() {
             </div>
 
             <div className="util">
-              <button className="icon-btn" id="btnSound" title="Sound on/off" aria-label="Sound">&#128266;</button>
+              <button className="icon-btn" id="btnSound" title="Sound settings" aria-label="Sound settings">&#128266;</button>
               <button className="icon-btn" id="btnHistory" title="History" aria-label="History">&#128220;</button>
             </div>
           </footer>
@@ -188,11 +199,15 @@ export default function Game() {
         {/* the intro plays once, then swaps instantly to the looping startscreen2 */}
         <video className="start-bg show" id="startBg1" src="/assets/start_screen.mp4" muted playsInline preload="auto" aria-hidden="true" />
         <video className="start-bg" id="startBg2" src="/assets/startscreen2.mp4" muted loop playsInline preload="auto" aria-hidden="true" />
+
         <div className="start-inner">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="start-logo" src="/assets/logo.png" alt="Aether Dynasty" draggable={false} />
-          <button className="start-btn loading" id="btnStart" type="button" disabled aria-busy="true">
-            <span className="start-btn-txt">Loading&hellip;</span>
+          {/* The asset preload + progress now lives on the boot loading screen
+              (#adLoading below). START is revealed by the controller once the
+              loading screen has finished and this home screen is being revealed. */}
+          <button className="start-btn" id="btnStart" type="button" hidden>
+            <span className="start-btn-txt">START GAME</span>
           </button>
         </div>
       </div>
@@ -201,6 +216,109 @@ export default function Game() {
       <div className="transition-fx" id="transition" hidden>
         <video className="transition-vid" id="transitionVid" src="/assets/transition.mp4"
           muted playsInline preload="auto" aria-hidden="true" />
+      </div>
+
+      {/* ── Home-screen nav bar — back · music toggle · player chip ──
+          Rendered at the TOP LEVEL (not inside #startScreen) and stacked above
+          both the splash and the portal transition (z 120), so it stays visible
+          on the home screen AND through the start→game transition. The controller
+          hides #splashTopbar once the game is revealed and re-shows it on Home. */}
+      <div className="splash-topbar" id="splashTopbar">
+        {/* LEFT: spacer (standalone build has no host to exit to — the in-game
+            Home button returns to this splash; there's no platform back button) */}
+        <div />
+
+        {/* RIGHT: music toggle + player chip */}
+        <div className="splash-topbar-right">
+          <button className="splash-music-btn" id="splashBtnMusic" aria-label="Toggle music">
+            {/* speaker-on icon (default visible) */}
+            <svg className="ico-sound-on" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+              <path d="M19.07 4.93a10 10 0 010 14.14"/>
+              <path d="M15.54 8.46a5 5 0 010 7.07"/>
+            </svg>
+            {/* speaker-off icon (shown when muted) */}
+            <svg className="ico-sound-off" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+              <line x1="23" y1="9" x2="17" y2="15"/>
+              <line x1="17" y1="9" x2="23" y2="15"/>
+            </svg>
+          </button>
+          <div className="splash-player-chip">
+            <div className="splash-pc-avatar" id="splashPlayerAvatar" aria-hidden="true" />
+            <div className="splash-pc-name" id="splashPlayerName">Player</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ===================== BOOT LOADING SCREEN =====================
+          Full-bleed "summoning the pantheon" sequence shown over everything on
+          first mount while the game assets preload. The controller (runLoadingScreen)
+          cycles the status text, drives #adLoadFill / #adLoadPct from real preload
+          progress, holds for up to 8s, then fade-zooms this away to reveal the
+          home screen. Styled to the game's gold + neon-cyan + plasma palette. */}
+      <div className="ad-loading" id="adLoading" role="progressbar"
+        aria-label="Loading Aether Dynasty" aria-valuemin={0} aria-valuemax={100}>
+        {/* animated aether backdrop: neon grid + nebula + rising gold motes */}
+        <div className="adl-bg" aria-hidden="true">
+          <div className="adl-nebula" />
+          <div className="adl-grid" />
+          <div className="adl-motes">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <span
+                key={i}
+                className="adl-mote"
+                style={{
+                  left: `${(i * 8.3 + 4) % 100}%`,
+                  width: `${3 + (i % 3)}px`,
+                  height: `${3 + (i % 3)}px`,
+                  animationDuration: `${6 + (i % 5) * 1.4}s`,
+                  animationDelay: `${(i % 6) * 0.9}s`,
+                }}
+              />
+            ))}
+          </div>
+          <div className="adl-vignette" />
+        </div>
+
+        <div className="adl-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="adl-logo" src="/assets/logo.png" alt="Aether Dynasty" draggable={false} />
+
+          {/* spinning rune loader with a glowing aether core */}
+          <div className="adl-ring" aria-hidden="true">
+            <svg className="r-1" viewBox="0 0 200 200" fill="none">
+              <circle cx="100" cy="100" r="96" stroke="#43e8ff" strokeWidth="1" strokeDasharray="2 12" opacity="0.55" />
+            </svg>
+            <svg className="r-2" viewBox="0 0 200 200" fill="none">
+              <circle cx="100" cy="100" r="84" stroke="#f4c64a" strokeWidth="2.5" strokeDasharray="64 46" strokeLinecap="round" opacity="0.92" />
+            </svg>
+            <svg className="r-3" viewBox="0 0 200 200" fill="none">
+              <circle cx="100" cy="100" r="70" stroke="#a64bff" strokeWidth="1.5" strokeDasharray="4 18" opacity="0.75" />
+            </svg>
+            <div className="adl-core" />
+          </div>
+
+          <div className="adl-status" id="adLoadStatus">AWAKENING THE AETHER&hellip;</div>
+
+          <div className="adl-bar-wrap">
+            <div className="adl-bar"><div className="adl-fill" id="adLoadFill" /></div>
+            <div className="adl-bar-info">
+              <span>&#47;&#47; AETHER</span>
+              <span className="adl-pct" id="adLoadPct">0%</span>
+              <span>SYNC &#47;&#47;</span>
+            </div>
+          </div>
+
+          <div className="adl-grid-info" aria-hidden="true">
+            <div className="cell"><div className="k">Realm</div><div className="v">Olympus</div></div>
+            <div className="cell"><div className="k">Ways</div><div className="v">46,656</div></div>
+            <div className="cell"><div className="k">RNG</div><div className="v">Chain</div></div>
+            <div className="cell"><div className="k">Link</div><div className="v">Stable</div></div>
+          </div>
+        </div>
       </div>
     </>
   );

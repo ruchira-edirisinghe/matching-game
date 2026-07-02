@@ -8,23 +8,22 @@
    Refresh / unmount don't stack duplicate handlers).
    ============================================================================= */
 
-import { GTSymbols } from "@/lib/symbols";
-import { GTEngine } from "@/lib/engine";
-import { GTRules } from "@/lib/rules";
-import { fetchBlockchainSeed, deriveSpinSeed, type BlockchainSeedResult } from "@/lib/blockchainRng";
-import { loadTransactions, saveTransaction } from "@/lib/transactions";
-import type { Board, Cascade, Cell, Engine, Heights, SymbolId } from "@/lib/types";
+import { GTSymbols } from "./symbols";
+import { GTEngine } from "./engine";
+import { GTRules } from "./rules";
+import { fetchBlockchainSeed, deriveSpinSeed, type BlockchainSeedResult } from "./blockchainRng";
+import { loadTransactions, saveTransaction } from "./transactions";
+import type { Board, Cascade, Cell, Heights, SymbolId } from "./types";
 
 declare global {
   interface Window {
+    /** Provably-fair seed inspector + profile chip. Set on boot, removed on cleanup. */
     GT?: {
-      engine: Engine;
-      doSpin: () => void;
-      render: (animateDrop?: boolean, breakFill?: boolean) => void;
-      state: () => { b: Board; h: Heights };
+      /** Provably-fair seed audit for the current chain seed (read-only). */
       seedInfo: () => BlockchainSeedResult | null;
+      /** Repaint the top-bar profile chip (avatar + name). */
+      setPlayer: (name?: string, avatarUrl?: string | null) => void;
     };
-    __showRulePage?: (i: number) => void;
     webkitAudioContext?: typeof AudioContext;
   }
 }
@@ -42,7 +41,9 @@ export function boot(): () => void {
   const COLS = GTEngine.COLS;     // 6
   const ROWS = GTEngine.MAX_ROWS; // 6
 
-  const engine = GTEngine.create({ balance: 50000, bet: 3 });
+  // Standalone demo balance.
+  const startBalance = 50000;
+  const engine = GTEngine.create({ balance: startBalance, bet: 3 });
 
   // ---- DOM refs --------------------------------------------------------------
   const $ = (id: string): HTMLElement => document.getElementById(id) as HTMLElement;
@@ -63,6 +64,8 @@ export function boot(): () => void {
   let shownBalance = engine.balance;
   let gameReady = false;     // splash "Loading…" clears once the first board + seed are ready
   let splashGone = false;    // guards the splash dismissal so it fires exactly once
+  let assetProgress = 0;     // 0..1 real asset-preload fraction, reported by preloadAssets
+  let assetsDone = false;    // true once every asset has loaded (or the preload cap fired)
   const history: HistoryEntry[] = [];   // transaction log, newest first
 
   // Every listener is registered with this signal so one abort() in the cleanup
@@ -114,10 +117,59 @@ export function boot(): () => void {
     refreshSeed();   // throttled background refresh for upcoming spins
   }
 
+  // ---- player profile chip ---------------------------------------------------
+  // Paint the top-bar avatar + name from host-provided values. Imperative (by id)
+  // like the rest of the HUD, so a React re-render never clobbers it. Falls back
+  // to the name's initials when there's no usable picture (or it fails to load).
+  function setPlayer(name?: string, avatarUrl?: string | null): void {
+    const nm = name && name.trim() ? name.trim() : "Player";
+    const initials = nm.slice(0, 2).toUpperCase();
+    const raw = avatarUrl && avatarUrl.trim() ? avatarUrl.trim() : "";
+    const url = /^(https?:\/\/|data:image\/)/i.test(raw) ? raw : "";
+
+    function paintDisc(disc: HTMLElement): void {
+      if (url) {
+        disc.textContent = "";
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = nm;
+        img.referrerPolicy = "no-referrer";
+        img.onerror = () => { disc.textContent = initials; };
+        disc.appendChild(img);
+      } else {
+        disc.textContent = initials;
+      }
+    }
+
+    const nameEl = document.getElementById("playerName");
+    if (nameEl) nameEl.textContent = nm;
+    const disc = document.getElementById("playerAvatar");
+    if (disc) paintDisc(disc);
+
+    // Also paint the splash-screen chip so the player info is visible from the
+    // home screen before the game screen is revealed.
+    const splashNameEl = document.getElementById("splashPlayerName");
+    if (splashNameEl) splashNameEl.textContent = nm;
+    const splashDisc = document.getElementById("splashPlayerAvatar");
+    if (splashDisc) paintDisc(splashDisc);
+  }
+
   // =============================================================================
   // Boot (runs once the React markup is mounted)
   // =============================================================================
   function init(): void {
+    // Reset the boot loading screen to its initial state (loader shown, not yet
+    // dissolved; home not yet revealed; START hidden) so a StrictMode / Fast-Refresh
+    // remount replays the loading sequence cleanly instead of inheriting a "done"
+    // loader / revealed home left in the persistent DOM by the previous mount.
+    const alReset = document.getElementById("adLoading");
+    if (alReset) { alReset.hidden = false; alReset.classList.remove("done"); }
+    const homeReset = document.getElementById("startScreen"); if (homeReset) homeReset.classList.remove("reveal");
+    const sbReset = document.getElementById("btnStart"); if (sbReset) sbReset.hidden = true;
+    // Hide the home chrome (back / music / player chip) while the loader is up;
+    // it's re-shown when the home screen is revealed at the end of loading.
+    showSplashChrome(false);
+
     $("filter-defs").innerHTML = S.FILTER_DEFS;
 
     // Warm the cascade break-frame GIF so it's cached before the first break
@@ -125,12 +177,12 @@ export function boot(): () => void {
     if (typeof Image !== "undefined") { new Image().src = "/assets/cell-break.gif"; }
 
     // Videos: force-mute (React doesn't reliably reflect the `muted` attribute)
-    // so autoplay is allowed. The in-game background loops immediately; the splash
-    // runs its intro→loop sequence (setupSplashBg); the transition is preloaded only.
+    // so autoplay is allowed. Only the splash runs now (intro→loop, setupSplashBg);
+    // the in-game background is started later by playGameBg() when the game screen
+    // is revealed, and the transition is preloaded only. Decoding several videos at
+    // once is the main cause of jank in the mobile webview, so we keep it to one.
     document.querySelectorAll<HTMLVideoElement>("video.start-bg, video.screen-bg, #transitionVid")
       .forEach((v) => { v.muted = true; });
-    document.querySelectorAll<HTMLVideoElement>("video.screen-bg")
-      .forEach((v) => { v.play().catch(() => { /* autoplay may defer; harmless */ }); });
     setupSplashBg();
 
     // Background music — looping at the music volume (default 35%). Browsers
@@ -169,21 +221,34 @@ export function boot(): () => void {
     betValEl.textContent = String(engine.bet);
     winValEl.textContent = "0.00";
 
-    // headless / debug hooks
-    window.GT = { engine, doSpin, render: renderBoard, state: () => ({ b: currentBoard, h: currentHeights }), seedInfo: () => seedAudit };
+    // Paint the top-bar profile chip. Standalone has no host player, so this
+    // renders the default "Player" placeholder.
+    setPlayer();
 
-    // Provably-fair seeding: fetch the first blockchain seed and clear the
-    // splash's "Loading…" state once it lands — or after a short cap, so a slow
-    // or failed fetch never strands the player on the splash. (This is the
-    // initial equivalent of refreshSeed(true); later spins use the throttled
-    // background refresh in seedNextSpin.) The first board is already on screen.
-    const readyCap = setTimeout(markReady, 1600);
-    const revealStart = () => { if (signal.aborted) return; clearTimeout(readyCap); markReady(); };
+    // Provably-fair seed inspector (no internal-state debug hooks shipped).
+    // seedInfo exposes the verifiable chain seed for the current spin; setPlayer
+    // lets anything that later learns a name/avatar repaint the profile chip.
+    window.GT = {
+      seedInfo: () => seedAudit,
+      setPlayer,
+    };
+
+    // Provably-fair seeding: fetch the first blockchain seed in the background so
+    // it's ready for the first spin. Readiness of the splash is now gated on the
+    // asset-preload bar (preloadAssets) — NOT on this — so a slow or failed seed
+    // fetch never affects when START appears (each spin also has a Math.random
+    // fallback). Later spins use the throttled background refresh in seedNextSpin.
     seedFetching = true; lastSeedFetch = Date.now();
     fetchBlockchainSeed(signal)
       .then((r) => { if (!signal.aborted) seedAudit = r; })
       .catch(() => { /* per-spin fallback covers a missing seed */ })
-      .finally(() => { seedFetching = false; revealStart(); });
+      .finally(() => { seedFetching = false; });
+
+    // Preload all game assets (feeds the loading screen's progress), then run the
+    // boot loading screen: it cycles the status text, drives the bar, holds for up
+    // to 8s and finally fade-zooms away to reveal the home screen with START.
+    preloadAssets();
+    runLoadingScreen();
 
     // Restore this player's transaction history from Firebase (seed once, before
     // any spin this session, so live spins aren't clobbered).
@@ -197,21 +262,6 @@ export function boot(): () => void {
       if (history.length > 500) history.length = 500;
       if (!$("historyModal").hidden) renderHistory();
     });
-    // Deep links that auto-launch a flow shouldn't sit behind the splash screen.
-    if (/[?&](autospin|free|rules)/.test(location.search)) $("startScreen").hidden = true;
-    if (/[?&]autospin/.test(location.search)) {
-      autoInfinite = true; btnAuto.classList.add("on"); updateAutoBtn(); refreshSpinBtn();
-      setTimeout(doSpin, 200);
-    }
-    if (/[?&]rules/.test(location.search)) {
-      $("rulesModal").hidden = false;
-      const m = location.search.match(/rules=(\d)/); if (m) window.__showRulePage?.(+m[1]);
-    }
-    if (/[?&]free/.test(location.search)) {
-      engine.st.inFree = true; engine.st.freeLeft = 6; engine.st.freeTotal = 6; engine.st.mult = 2;
-      engine.st.goldenTreasureUsed = false;
-      setTimeout(() => { setSpinning(true); runFreeGames().then(() => setSpinning(false)); }, 250);
-    }
   }
 
   // =============================================================================
@@ -281,6 +331,7 @@ export function boot(): () => void {
     const d = Math.max(60, dur * (skip ? 0.05 : 1));
     return new Promise((res) => {
       function tick(t: number) {
+        if (signal.aborted) { res(); return; }   // stop the rAF loop once the mount tore down
         const k = Math.min(1, (t - t0) / d);
         const e = 1 - Math.pow(1 - k, 3);
         setter(from + (to - from) * e);
@@ -312,7 +363,7 @@ export function boot(): () => void {
   // =============================================================================
   let actx: AudioContext | null = null;
   function beep(freq: number, dur: number, type?: OscillatorType, vol?: number): void {
-    if (sfxVolume <= 0) return;
+    if (signal.aborted || sfxVolume <= 0) return;   // never open an AudioContext after teardown
     try {
       actx = actx || new (window.AudioContext || window.webkitAudioContext!)();
       // Browsers start the context suspended until a user gesture; resume it so
@@ -331,13 +382,19 @@ export function boot(): () => void {
   const sndSpin = (): void => beep(180, 0.18, "sawtooth", 0.04);
   const sndWin = (i: number): void => beep(440 + Math.min(i, 8) * 70, 0.16, "triangle", 0.06);
   const sndDrop = (): void => beep(120, 0.08, "square", 0.03);
-  const sndBig = (): void => { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.25, "triangle", 0.07), i * 90)); };
+  const sndBigTimers: ReturnType<typeof setTimeout>[] = [];
+  const sndBig = (): void => {
+    [523, 659, 784, 1046].forEach((f, i) => {
+      sndBigTimers.push(setTimeout(() => { beep(f, 0.25, "triangle", 0.07); }, i * 90));
+    });
+  };
+  signal.addEventListener("abort", () => { sndBigTimers.forEach(clearTimeout); sndBigTimers.length = 0; }, { once: true });
 
   // Background music: looping mp3 at the current music volume (default 35%, set
   // in the Sound popup). Browsers block audio autoplay until a user gesture, so
   // init() also kicks this off on the first interaction with the start screen.
   function startMusic(): void {
-    if (!bgMusic || musicVolume <= 0) return;
+    if (signal.aborted || !bgMusic || musicVolume <= 0) return;
     bgMusic.volume = musicVolume;
     bgMusic.play().catch(() => { /* needs a user gesture; retried on first interaction */ });
   }
@@ -372,6 +429,11 @@ export function boot(): () => void {
     const intro = document.getElementById("startBg1") as HTMLVideoElement | null;
     const loop = document.getElementById("startBg2") as HTMLVideoElement | null;
     if (!intro || !loop) return;
+    // Normalize the crossfade state so every boot starts from a known visual (the
+    // intro showing), regardless of a `.show` class left on the persistent DOM by
+    // a previous mount (StrictMode / Fast Refresh) — otherwise goHome() could read
+    // a stale `.show` and resume the wrong clip.
+    intro.classList.add("show"); loop.classList.remove("show");
     intro.muted = true; loop.muted = true;
     intro.play().catch(() => { /* autoplay may defer; harmless */ });
     const toLoop = (): void => {
@@ -388,17 +450,205 @@ export function boot(): () => void {
     intro.addEventListener("ended", toLoop, { signal });
   }
 
-  // Swap the START button out of its "Loading…" state once the game is ready.
+  // Preload every game asset up front (images + the in-DOM videos/audio) so by the
+  // time the loader ends the videos are buffered and decode-warm and the first play
+  // is lag-free. Reports progress into `assetProgress` (0..1) and flips `assetsDone`
+  // when everything is ready (or a hard cap fires); runLoadingScreen() turns that
+  // into the visible bar and the hand-off to the home screen.
+  function preloadAssets(): void {
+    const A = "/assets/";
+    const images = [
+      "logo.png", "cell-bg.png", "cell-locked.png", "cell-break.gif",
+      "buttons/turbo.png", "buttons/super-turbo.png", "buttons/auto.png",
+      "buttons/spin-idle.png", "buttons/spin-rotating.png",
+      "buttons/sound.png", "buttons/history.png", "buttons/info.png", "buttons/close.png",
+    ];
+    // Wait on the actual in-DOM media (already buffering via preload="auto") so
+    // there's no duplicate download. We gate on `loadeddata` (first frame decoded
+    // → the hardware decoder is warm) rather than full `canplaythrough`, so the
+    // bar finishes in a few seconds; the small videos keep buffering in the
+    // background and, since they're paused until needed (transition after START,
+    // bg when the game shows), they're fully buffered by the time they play.
+    const media: HTMLMediaElement[] = [];
+    ["startBg1", "startBg2", "transitionVid", "bgMusic"].forEach((id) => {
+      const el = document.getElementById(id) as HTMLMediaElement | null;
+      if (el) media.push(el);
+    });
+    document.querySelectorAll<HTMLMediaElement>("video.screen-bg").forEach((v) => media.push(v));
+
+    const total = images.length + media.length;
+    let loaded = 0;
+    let finished = false;
+
+    const finish = (): void => {
+      if (finished || signal.aborted) return;   // ignore after unmount
+      finished = true;
+      clearTimeout(cap);
+      assetProgress = 1;
+      assetsDone = true;
+    };
+    const bump = (): void => {
+      if (finished || signal.aborted) return;   // ignore late asset callbacks after unmount
+      loaded++;
+      assetProgress = total ? loaded / total : 1;
+      if (loaded >= total) finish();
+    };
+    // hard cap: never leave assetsDone unset if an asset hangs. Track the per-asset
+    // timers too so abort (StrictMode unmount) clears them all — none fire
+    // bump()/finish() into a torn-down mount.
+    const perTimers: Array<ReturnType<typeof setTimeout>> = [];
+    const cap = setTimeout(finish, 20000);
+    signal.addEventListener("abort", () => { clearTimeout(cap); perTimers.forEach((t) => clearTimeout(t)); }, { once: true });
+
+    images.forEach((src) => {
+      const im = new Image();
+      im.onload = bump;
+      im.onerror = bump;   // count failures as done so progress can still complete
+      im.src = A + src;
+    });
+
+    media.forEach((el) => {
+      if (el.readyState >= 2) { bump(); return; }   // HAVE_CURRENT_DATA (first frame) already
+      let settled = false;
+      const ok = (): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(perTimer);   // async callback → perTimer is always assigned by the time this runs
+        el.removeEventListener("loadeddata", ok);
+        el.removeEventListener("error", ok);
+        bump();
+      };
+      el.addEventListener("loadeddata", ok, { signal });
+      el.addEventListener("error", ok, { signal });
+      const perTimer = setTimeout(ok, 12000);   // per-asset cap (below the 20s global cap)
+      perTimers.push(perTimer);
+    });
+  }
+
+  // The boot loading screen: cycle the divine status text, drive the bar from the
+  // real preload progress (with a time floor so it always creeps forward), hold for
+  // up to 8s, then fade-zoom the loader away while the home screen zooms in and the
+  // START button appears. Finishes as soon as assets are ready (after a short
+  // minimum) or at the 8s hard cap — whichever comes first.
+  function runLoadingScreen(): void {
+    const screen = document.getElementById("adLoading");
+    const fill = document.getElementById("adLoadFill");
+    const pctEl = document.getElementById("adLoadPct");
+    const statusEl = document.getElementById("adLoadStatus");
+
+    const HARD_CAP = 8000;   // never show the loader longer than 8s
+    const MIN_SHOW = 2600;   // ...but always show it long enough to read a few lines
+    const TEXTS = [
+      "AWAKENING THE AETHER…",
+      "SUMMONING THE PANTHEON…",
+      "ALIGNING THE CONSTELLATIONS…",
+      "FORGING GOLDEN RELICS…",
+      "CHARGING THE DIVINE REELS…",
+      "CONSULTING THE ORACLE…",
+      "ENTERING OLYMPUS…",
+    ];
+    const t0 = performance.now();
+    let display = 0;         // eased 0..1 currently shown on the bar
+    let finished = false;
+
+    const setStatus = (txt: string): void => {
+      if (!statusEl) return;
+      statusEl.textContent = txt;
+      // re-trigger the fade-in on each change (reflow between clear + restore)
+      statusEl.style.animation = "none";
+      void statusEl.offsetWidth;
+      statusEl.style.animation = "";
+    };
+    const paint = (frac: number): void => {
+      const v = Math.max(0, Math.min(100, Math.round(frac * 100)));
+      if (fill) fill.style.width = v + "%";
+      if (pctEl) pctEl.textContent = v + "%";
+      if (screen) screen.setAttribute("aria-valuenow", String(v));   // announce progress to assistive tech
+    };
+
+    // cycle the status text; hold the final "Entering Olympus…" line
+    let ti = 0;
+    if (statusEl) statusEl.textContent = TEXTS[0];
+    const textTimer = setInterval(() => {
+      if (finished) { clearInterval(textTimer); return; }
+      ti++;
+      if (ti >= TEXTS.length - 1) { setStatus(TEXTS[TEXTS.length - 1]); clearInterval(textTimer); return; }
+      setStatus(TEXTS[ti]);
+    }, 1150);
+
+    const finishLoading = (): void => {
+      if (finished || signal.aborted) return;
+      finished = true;
+      clearInterval(textTimer);
+      clearInterval(tick);
+      clearTimeout(capT);
+      paint(1);
+      setStatus(TEXTS[TEXTS.length - 1]);
+      markReady();                     // reveal START on the home screen beneath
+      showSplashChrome(true);          // bring back the home chrome (back / music / chip)
+      const home = document.getElementById("startScreen");
+      if (home) home.classList.add("reveal");   // fade-zoom the home screen in
+      // let the full bar + "Entering Olympus…" register, then dissolve the loader
+      setTimeout(() => {
+        if (signal.aborted) return;
+        if (screen) screen.classList.add("done");
+        setTimeout(() => { if (screen && !signal.aborted) screen.hidden = true; }, 900);
+      }, 300);
+    };
+
+    // eased progress ticker
+    const tick = setInterval(() => {
+      if (finished || signal.aborted) { clearInterval(tick); return; }
+      const elapsed = performance.now() - t0;
+      const timeFloor = Math.min(0.9, elapsed / HARD_CAP);            // always creeps forward
+      const target = Math.min(0.985, Math.max(assetProgress * 0.96, timeFloor));
+      display += (target - display) * 0.12;                           // smooth easing
+      paint(display);
+      if ((assetsDone && elapsed >= MIN_SHOW) || elapsed >= HARD_CAP) finishLoading();
+    }, 60);
+
+    // absolute backstop in case the interval is throttled (e.g. backgrounded tab)
+    const capT = setTimeout(finishLoading, HARD_CAP + 250);
+    signal.addEventListener("abort", () => { clearInterval(textTimer); clearInterval(tick); clearTimeout(capT); }, { once: true });
+
+    paint(0);
+  }
+
+  // Reveal the START button once the loading screen hands off to the home screen.
+  // Idempotent (gameReady guard).
   function markReady(): void {
-    if (gameReady) return;
+    if (signal.aborted || gameReady) return;
     gameReady = true;
     const btn = document.getElementById("btnStart") as HTMLButtonElement | null;
-    if (!btn) return;
-    btn.disabled = false;
-    btn.setAttribute("aria-busy", "false");
-    btn.classList.remove("loading");
-    const t = btn.querySelector(".start-btn-txt");
-    if (t) t.textContent = "START GAME";
+    if (btn) { btn.hidden = false; btn.disabled = false; btn.setAttribute("aria-busy", "false"); }
+  }
+
+  // The home-screen nav bar (back / volume / profile) is a top-level overlay
+  // (z 120) so it sits above the splash AND the portal transition. Show it on the
+  // home screen and through the transition; hide it once the game screen is shown.
+  function showSplashChrome(show: boolean): void {
+    const bar = document.getElementById("splashTopbar");
+    if (bar) bar.hidden = !show;
+  }
+
+  // Mobile perf: keep only ONE background video decoding at a time. The in-game
+  // background (.screen-bg) plays only while the game is on screen; the splash
+  // clips (#startBg1/#startBg2) only while the splash/transition is up. Several
+  // simultaneous video decodes are the main source of jank in the mobile webview.
+  function playGameBg(): void {
+    document.querySelectorAll<HTMLVideoElement>("video.screen-bg").forEach((v) => {
+      v.muted = true;
+      v.play().catch(() => { /* may defer until a gesture; harmless */ });
+    });
+  }
+  function pauseGameBg(): void {
+    document.querySelectorAll<HTMLVideoElement>("video.screen-bg").forEach((v) => { try { v.pause(); } catch { /* ignore */ } });
+  }
+  function pauseSplashVideos(): void {
+    ["startBg1", "startBg2"].forEach((id) => {
+      const v = document.getElementById(id) as HTMLVideoElement | null;
+      if (v) { try { v.pause(); } catch { /* ignore */ } }
+    });
   }
 
   // Reveal the game on Start. Ignored until the game is ready, and fires exactly
@@ -416,7 +666,7 @@ export function boot(): () => void {
     const game = document.getElementById("game");
 
     // Fallback: if the transition layer isn't present, just hide the splash.
-    if (!tr || !vid || !game) { if (ss) ss.hidden = true; return; }
+    if (!tr || !vid || !game) { if (ss) ss.hidden = true; showSplashChrome(false); playGameBg(); pauseSplashVideos(); return; }
 
     let finished = false;
     // Exit — when the clip ends (or the safety net fires), FADE the transition
@@ -425,9 +675,12 @@ export function boot(): () => void {
     const finish = (): void => {
       if (finished) return;
       finished = true;
+      showSplashChrome(false);             // game is being revealed → drop the home nav bar
+      playGameBg(); pauseSplashVideos();   // only the game bg decodes during play (perf)
       vid.removeEventListener("ended", finish);
       tr.classList.remove("show");         // fade out (.55s) → game shows beneath
       setTimeout(() => {
+        if (signal.aborted) return;
         tr.hidden = true;
         try { vid.pause(); vid.currentTime = 0; } catch { /* ignore */ }
       }, 600);
@@ -442,24 +695,32 @@ export function boot(): () => void {
     try { vid.currentTime = 0; } catch { /* metadata may not be ready; harmless */ }
     const p = vid.play();
     if (p && typeof p.catch === "function") p.catch(() => { /* blocked → safety net covers it */ });
-    setTimeout(() => { if (ss) ss.hidden = true; }, 600);   // drop the splash once the transition has faded in
+    setTimeout(() => { if (signal.aborted) return; if (ss) ss.hidden = true; }, 600);   // drop the splash once the transition has faded in
 
-    // safety net: if 'ended' never fires (decode stall / blocked play), force-finish
+    // safety net: if 'ended' never fires (decode stall / blocked play), force-finish.
+    // Cleared via signal so a Strict-Mode double-mount doesn't fire this into the
+    // second boot's DOM after the first cleanup already ran.
     const durMs = (vid.duration && isFinite(vid.duration) ? vid.duration : 8.5) * 1000 + 1800;
-    setTimeout(finish, durMs);
+    const safetyNet = setTimeout(finish, durMs);
+    signal.addEventListener("abort", () => clearTimeout(safetyNet), { once: true });
   }
 
-  // Back-to-home button: bring the splash back over the running game and re-arm
-  // START. The game keeps its state underneath; pressing START plays the portal
-  // transition again and reveals it.
+  // Back-to-home button: bring the splash (the game's own home screen) back over
+  // the running game and re-arm START. The game keeps its state underneath;
+  // pressing START replays the portal transition and reveals it. This always
+  // returns to the home screen — exiting to the host platform is the splash nav
+  // bar's Back button (wired to onExit in React), never this Home button.
   function goHome(): void {
+    stopAuto();                           // don't leave auto-spin running on the way out
+    if (spinning) skip = true;            // fast-forward any in-flight spin so it settles
+                                          // cleanly instead of animating behind the splash
     const ss = document.getElementById("startScreen");
     if (!ss) return;
-    stopAuto();                           // don't leave auto-spin running behind the splash
     const tr = document.getElementById("transition");
     if (tr) tr.hidden = true;
     ss.classList.remove("hide");
     ss.hidden = false;
+    showSplashChrome(true);               // bring the home nav bar back with the splash
     splashGone = false;                   // re-arm START (click / Space / Enter)
     // resume whichever splash clip is currently shown — the startscreen2 loop if
     // the intro already finished, otherwise the intro itself
@@ -467,6 +728,7 @@ export function boot(): () => void {
     const loop = document.getElementById("startBg2") as HTMLVideoElement | null;
     if (loop && loop.classList.contains("show")) { loop.muted = true; loop.play().catch(() => { /* defer */ }); }
     else if (intro) { intro.muted = true; intro.play().catch(() => { /* defer */ }); }
+    pauseGameBg();                        // game hidden again → stop decoding its bg video
     beep(420, 0.08, "square", 0.04);      // soft back blip
   }
 
@@ -495,12 +757,17 @@ export function boot(): () => void {
     const prevBal = engine.balance;
 
     await preSpin();
+    if (signal.aborted) { setSpinning(false); return; }   // torn down mid-spin — abandon the zombie spin
 
     seedNextSpin();              // re-seed the engine from the blockchain seed
     const result = engine.spin();
 
-    // deduct bet visually (base game only)
-    if (!result.freeMode) setBalanceInstant(prevBal - engine.bet);
+    // deduct the bet visually (base game only; free spins are free). Capture the
+    // stake up front so the history entry records the bet locked in at spin start.
+    const betForSpin = engine.bet;
+    if (!result.freeMode) {
+      setBalanceInstant(prevBal - betForSpin);
+    }
 
     // land the initial board
     currentBoard = result.initial.board;
@@ -513,6 +780,7 @@ export function boot(): () => void {
     // play cascades
     let runWin = 0;
     for (let i = 0; i < result.cascades.length; i++) {
+      if (signal.aborted) return;
       await playCascade(result.cascades[i], i);
       runWin += result.cascades[i].totalWin;
       // Clamp the WIN readout and balance to the engine's actually-credited
@@ -525,7 +793,7 @@ export function boot(): () => void {
 
     // reconcile balance exactly with the engine
     await animateBalanceTo(engine.balance);
-    recordHistory("spin", engine.bet, runWin, engine.balance);
+    recordHistory("spin", betForSpin, runWin, engine.balance);   // betForSpin: the stake locked in at spin start
 
     // feature transitions — keep the spin locked while overlays / free games
     // run so a stray Space or button press can't start a concurrent spin
@@ -545,14 +813,16 @@ export function boot(): () => void {
       if (!autoInfinite) autoRemaining--;
       $("btnAuto").classList.toggle("on", autoRemaining > 0 || autoInfinite);
       updateAutoBtn(); refreshSpinBtn();
-      if ((autoRemaining > 0 || autoInfinite) && engine.canSpin()) {
+      if ((autoRemaining > 0 || autoInfinite) && engine.canSpin() && !signal.aborted) {
         await sleep(450);
-        if (autoRemaining > 0 || autoInfinite) doSpin();   // user may have stopped during the gap
+        // user may have stopped during the gap — and never re-enter after unmount
+        if ((autoRemaining > 0 || autoInfinite) && !signal.aborted) doSpin();
       } else { stopAuto(); }
     }
   }
 
   async function playCascade(casc: Cascade, index: number): Promise<void> {
+    if (signal.aborted) return;
     // 1) highlight winning cells
     casc.winCells.forEach(([c, r]) => { if (cells[c] && cells[c][r]) cells[c][r].classList.add("win"); });
     if (casc.golden) showWinPop("GOLDEN TREASURE!", true);
@@ -651,6 +921,7 @@ export function boot(): () => void {
     let freeTotalWin = 0;
 
     while (engine.inFree && engine.st.freeLeft > 0) {
+      if (signal.aborted) break;
       $("fgLeft").textContent = String(engine.st.freeLeft);
       $("fgMult").textContent = String(engine.st.mult);
       await sleep(420);
@@ -705,8 +976,10 @@ export function boot(): () => void {
     return new Promise((res) => {
       let done = false;
       const finish = () => { if (done) return; done = true; ov.removeEventListener("click", finish); ov.hidden = true; ov.querySelectorAll(".ov-coin").forEach((c) => c.remove()); res(); };
-      ov.addEventListener("click", finish);
-      setTimeout(finish, skip ? 350 : holdMs);
+      ov.addEventListener("click", finish, { signal });
+      const tid = setTimeout(finish, skip ? 350 : holdMs);
+      // On unmount: clear the timer and resolve so the awaiting spin never hangs.
+      signal.addEventListener("abort", () => { clearTimeout(tid); finish(); }, { once: true });
     });
   }
   function rainCoins(ov: HTMLElement): void {
@@ -755,6 +1028,10 @@ export function boot(): () => void {
     $("btnStart").addEventListener("click", dismissStart, { signal });
     const onStartKey = (e: KeyboardEvent) => {
       if ($("startScreen").hidden) return;   // splash already gone
+      // The Sound popup is reachable from the splash (music button). If any modal
+      // is open over the splash, the keypress belongs to it — don't launch the
+      // game transition behind an open popup.
+      if (!$("soundModal").hidden || !$("rulesModal").hidden || !$("historyModal").hidden || !$("autoModal").hidden) return;
       if (e.code === "Space" || e.code === "Enter" || e.code === "NumpadEnter") {
         e.preventDefault();
         dismissStart();
@@ -794,33 +1071,61 @@ export function boot(): () => void {
 
     btnAuto.addEventListener("click", () => {
       if (autoRemaining > 0 || autoInfinite) { stopAuto(); return; }
+      closeAllModals();
       $("autoModal").hidden = false;
     }, { signal });
 
     // sound button → open the volume popup (Music + Effects sliders)
     const fmtPct = (v: number): string => Math.round(v * 100) + "%";
-    $("btnSound").addEventListener("click", () => {
+
+    // Only one modal open at a time — close any other popup before opening one so
+    // they can never stack (an Esc / backdrop click would otherwise dismiss several
+    // at once, and controls behind a popup could open a second over it).
+    const closeAllModals = (): void => {
+      ["rulesModal", "autoModal", "historyModal", "soundModal"].forEach((id) => { $(id).hidden = true; });
+    };
+
+    // Helper that opens the sound modal pre-filled with current volumes — shared
+    // by the in-game button and the splash-screen button.
+    const openSoundModal = (): void => {
+      closeAllModals();
       ($("musicVol") as HTMLInputElement).value = String(Math.round(musicVolume * 100));
       ($("sfxVol") as HTMLInputElement).value = String(Math.round(sfxVolume * 100));
       $("musicVolVal").textContent = fmtPct(musicVolume);
       $("sfxVolVal").textContent = fmtPct(sfxVolume);
       $("soundModal").hidden = false;
-    }, { signal });
+    };
+
+    // Keeps the splash speaker icon in sync whenever the music volume changes.
+    const splashMusicBtn = document.getElementById("splashBtnMusic");
+    const syncSplashMusicIcon = (): void => {
+      if (splashMusicBtn) splashMusicBtn.classList.toggle("is-muted", musicVolume <= 0);
+    };
+    if (splashMusicBtn) {
+      splashMusicBtn.addEventListener("click", openSoundModal, { signal });
+    }
+
+    $("btnSound").addEventListener("click", openSoundModal, { signal });
     $("musicVol").addEventListener("input", (e) => {
       musicVolume = (+(e.target as HTMLInputElement).value) / 100;
       $("musicVolVal").textContent = fmtPct(musicVolume);
       $("btnSound").classList.toggle("muted", musicVolume === 0);
       if (bgMusic) bgMusic.volume = musicVolume;
       if (musicVolume > 0) startMusic(); else if (bgMusic) bgMusic.pause();
+      syncSplashMusicIcon();
     }, { signal });
+    let lastSfxBlip = 0;
     $("sfxVol").addEventListener("input", (e) => {
       sfxVolume = (+(e.target as HTMLInputElement).value) / 100;
       $("sfxVolVal").textContent = fmtPct(sfxVolume);
-      beep(620, 0.08, "triangle", 0.06);   // sample blip so the level is audible
+      // sample blip so the level is audible — throttled so dragging the slider
+      // doesn't spawn a burst of overlapping oscillators
+      const now = performance.now();
+      if (now - lastSfxBlip > 120) { lastSfxBlip = now; beep(620, 0.08, "triangle", 0.06); }
     }, { signal });
     $("soundClose").addEventListener("click", () => { $("soundModal").hidden = true; }, { signal });
     $("soundModal").addEventListener("click", (e) => { if (e.target === $("soundModal")) $("soundModal").hidden = true; }, { signal });
-    $("btnHistory").addEventListener("click", () => { renderHistory(); $("historyModal").hidden = false; }, { signal });
+    $("btnHistory").addEventListener("click", () => { closeAllModals(); renderHistory(); $("historyModal").hidden = false; }, { signal });
     $("historyClose").addEventListener("click", () => { $("historyModal").hidden = true; }, { signal });
     $("historyModal").addEventListener("click", (e) => { if (e.target === $("historyModal")) $("historyModal").hidden = true; }, { signal });
 
@@ -831,7 +1136,7 @@ export function boot(): () => void {
     document.addEventListener("keydown", onEscKey, { signal });
 
     // rules modal
-    $("btnRules").addEventListener("click", () => { $("rulesModal").hidden = false; }, { signal });
+    $("btnRules").addEventListener("click", () => { closeAllModals(); $("rulesModal").hidden = false; }, { signal });
     $("rulesClose").addEventListener("click", () => { $("rulesModal").hidden = true; }, { signal });
     $("rulesModal").addEventListener("click", (e) => { if (e.target === $("rulesModal")) $("rulesModal").hidden = true; }, { signal });
 
@@ -867,7 +1172,7 @@ export function boot(): () => void {
         b.classList.add("sel");
         autoSelected = o === "∞" ? "inf" : o;
         setAutoDisplay();
-      });
+      }, { signal });
       grid.appendChild(b);
     });
     grid.firstElementChild?.classList.add("sel");
@@ -899,7 +1204,7 @@ export function boot(): () => void {
     pages.forEach((p, i) => {
       const b = document.createElement("button");
       b.textContent = p.tab;
-      b.addEventListener("click", () => showRulePage(i));
+      b.addEventListener("click", () => showRulePage(i), { signal });
       tabsEl.appendChild(b);
     });
     function showRulePage(i: number): void {
@@ -917,7 +1222,6 @@ export function boot(): () => void {
       const pg = bodyEl.querySelector("#paytableGrid");
       if (pg) buildPaytable(pg as HTMLElement);
     }
-    window.__showRulePage = showRulePage;
     showRulePage(0);
   }
 
@@ -949,7 +1253,6 @@ export function boot(): () => void {
     if (actx) { actx.close().catch(() => { /* ignore */ }); actx = null; }
     if (bgMusic) { bgMusic.pause(); bgMusic = null; }
     delete window.GT;
-    delete window.__showRulePage;
   };
 }
 

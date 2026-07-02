@@ -35,7 +35,10 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .screen{
   position:relative;
   isolation:isolate;   /* force a stacking context so the z-index:-1 bg video stays contained + visible */
-  width:100vw;height:100vh;height:100dvh;
+  /* width:100% (not 100vw) so the game tracks its fixed parent's box exactly —
+     100vw includes the classic-scrollbar width and would push a sliver of
+     horizontal overflow when the host page shows a vertical scrollbar. */
+  width:100%;height:100vh;height:100dvh;
   margin:0;
   /* interior sizes are expressed in cqw/cqh so they track the stage size */
   container-type:size;
@@ -84,20 +87,6 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .rune-ring .rr-inner{transform-box:fill-box;transform-origin:center;animation:rrspin 70s linear infinite reverse;}
 @keyframes rrspin{to{transform:rotate(360deg);}}
 
-/* torches */
-.torch{position:absolute;width:58px;height:150px;z-index:4;pointer-events:none;
-  filter:drop-shadow(0 0 22px #ff8a1eaa);}
-.torch svg{width:100%;height:100%;}
-.torch-tl{top:8%;left:7%;}
-.torch-tr{top:8%;right:7%;}
-.torch-bl{bottom:20%;left:5%;}
-.torch-br{bottom:20%;right:5%;}
-.flame{transform-origin:50% 92%;animation:flicker .28s infinite alternate ease-in-out;}
-.flame-inner{animation:flickerIn .22s infinite alternate;}
-.torch-glow{animation:glow 1.6s infinite alternate ease-in-out;}
-@keyframes flicker{from{transform:scaleY(.96) scaleX(1.02) rotate(-1.5deg);}to{transform:scaleY(1.06) scaleX(.97) rotate(1.5deg);}}
-@keyframes flickerIn{from{opacity:.7;transform:translateY(2px) scaleY(.95);}to{opacity:1;transform:translateY(-2px) scaleY(1.05);}}
-@keyframes glow{from{opacity:.25;}to{opacity:.5;}}
 
 /* ---- top bar -------------------------------------------------------------- */
 .topbar{position:relative;z-index:6;display:flex;align-items:flex-start;justify-content:center;
@@ -109,14 +98,39 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 @keyframes logoFlick{0%,95%,100%{opacity:1;}96%{opacity:.78;}97%{opacity:1;}98.5%{opacity:.85;}}
 /* topbar controls: HOME pill anchored top-left, "How to play" pill top-right */
 .topbar-left{position:absolute;left:1.8cqw;top:50%;transform:translateY(-50%);
-  display:flex;align-items:center;}
+  display:flex;align-items:center;gap:clamp(8px,1cqw,14px);}
+
+/* player profile chip (avatar + name) — sits in the top-left next to HOME,
+   mirroring the avatar chip in the horse/car racing games */
+.player-chip{display:flex;align-items:center;gap:clamp(5px,.7cqw,9px);
+  max-width:min(34vw,230px);
+  padding:clamp(3px,.45cqh,5px) clamp(9px,1cqw,14px) clamp(3px,.45cqh,5px) clamp(3px,.4cqw,5px);
+  border-radius:999px;border:2px solid #ffd86a;
+  background:radial-gradient(120% 150% at 38% 18%, #16110a 0%, #0a0704 48%, #020101 100%);
+  box-shadow:0 0 14px #43e8ff66, 0 0 0 3px #00000088, inset 0 0 14px #00000088;}
+.pc-avatar{position:relative;flex:none;overflow:hidden;
+  width:clamp(28px,3.2cqw,44px);height:clamp(28px,3.2cqw,44px);border-radius:50%;
+  display:grid;place-items:center;border:2px solid #ffd86a;
+  background:radial-gradient(circle at 50% 32%, #2a1d0e, #0c0805);
+  color:#ffe9b8;font-family:var(--font-fx);font-weight:800;letter-spacing:.5px;
+  font-size:clamp(10px,1.25cqw,15px);text-shadow:0 1px 2px #000;}
+.pc-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}
+.pc-name{min-width:0;font-family:var(--font-head);color:#ffe9b8;font-weight:700;
+  font-size:clamp(12px,1.35cqw,16px);max-width:min(24vw,150px);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 2px #000;}
+/* Narrow phones: drop the name (avatar-only) so the chip never reaches the
+   centre logo. The avatar alone still shows who's playing. */
+@media (max-width:640px){
+  .player-chip{max-width:none;padding:clamp(2px,.4cqh,4px);gap:0;background:none;border:none;box-shadow:none;}
+  .pc-name{display:none;}
+}
 .topbar-right{position:absolute;right:1.8cqw;top:50%;transform:translateY(-50%);
   display:flex;align-items:center;gap:clamp(6px,.85cqw,12px);}
-/* shared dark-gold pill for the "How to play" + HOME buttons. min-width keeps
-   them the same size despite different label lengths (em → tracks the font). */
+/* shared dark-gold pill for the "How to play" + HOME buttons. Each pill sizes to
+   its own label (no forced min-width) so HOME stays compact; the shared padding
+   + equal icon size below keep both pills the exact same height. */
 .icon-btn.info-btn,.icon-btn.back-btn{
   display:flex;align-items:center;justify-content:center;gap:.55em;
-  min-width:14.5em;
   width:auto;height:auto;border-radius:999px;
   padding:clamp(7px,1.15cqh,13px) clamp(13px,1.5cqw,22px);
   font-family:var(--font-fx);text-transform:uppercase;
@@ -128,10 +142,10 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .icon-btn.info-btn:hover,.icon-btn.back-btn:hover{
   background:radial-gradient(120% 150% at 38% 18%, #241b0d 0%, #100a05 50%, #050302 100%);
   border-color:#ffe7a0;}
-.info-ico{width:1.95em;height:1.95em;flex:none;display:block;
+.info-ico{width:1.6em;height:1.6em;flex:none;display:block;
   background:url("/assets/buttons/info.png") center/contain no-repeat;
   filter:drop-shadow(0 1px 2px #000a);}
-.back-ico{width:1.55em;height:1.55em;flex:none;display:block;color:#ffe9b8;
+.back-ico{width:1.6em;height:1.6em;flex:none;display:block;color:#ffe9b8;
   filter:drop-shadow(0 1px 2px #000a);}
 .info-txt,.back-txt{white-space:nowrap;line-height:1;text-shadow:0 0 8px #43e8ff55, 0 1px 2px #000;}
 @keyframes infoPulse{0%,100%{box-shadow:0 0 14px #43e8ff99,0 0 0 3px #00000099,0 4px 14px #000a,inset 0 0 16px #00000099;}
@@ -337,7 +351,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   filter:saturate(.7) brightness(.92);opacity:.82;transition:filter .2s,opacity .2s;}
 .round-btn.turbo.on{box-shadow:0 0 16px #ffd24a;border-color:#fff;background:radial-gradient(circle at 35% 30%,#7a5a20,#3a2600);}
 .round-btn.turbo.on::before{opacity:1;filter:drop-shadow(0 0 6px #ffd24a) drop-shadow(0 0 3px #43e8ff88);}
-.round-btn.turbo.super::before{background-image:url("/assets/buttons/super-turbo.png");width:clamp(26px,3.4cqw,44px);}
+.round-btn.turbo.super::before{background-image:url("/assets/buttons/super-turbo.png");width:clamp(26px,3.4cqw,44px);height:clamp(24px,3.1cqw,40px);}
 /* AUTO uses the painted refresh button; live count shows over a disc while running */
 .round-btn.auto{background:url("/assets/buttons/auto.png") center/contain no-repeat;
   border:none;box-shadow:none;min-width:0;padding:0;border-radius:50%;
@@ -553,15 +567,23 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .start-bg.show{opacity:1;}
 .start-screen.hide{animation:startOut .55s ease forwards;pointer-events:none;}
 @keyframes startOut{to{opacity:0;transform:scale(1.04);}}
+/* first-boot reveal: after the loading screen dissolves, the home screen fades in
+   while zooming from slightly enlarged to rest — a "step through the portal" push
+   that hands off from the loader's own fade-zoom-out. */
+.start-screen.reveal{animation:homeZoomIn .95s cubic-bezier(.2,.85,.25,1) both;}
+@keyframes homeZoomIn{from{opacity:0;transform:scale(1.09);}to{opacity:1;transform:none;}}
 
-/* logo pinned to the top, button to the bottom; the warrior fills the gap */
+/* logo pinned to the top, button to the bottom; the warrior fills the gap. The
+   top padding clears the floating home-screen nav controls (~54px tall + the
+   device notch via safe-area) so the ÆTHER DYNASTY logo sits BELOW them — with
+   extra room for the logo's ±9px float so it never tucks behind the buttons. */
 .start-inner{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;
   align-items:center;justify-content:space-between;
-  padding:clamp(16px,4.5vh,58px) 5vw clamp(26px,7vh,84px);text-align:center;
+  padding:calc(82px + env(safe-area-inset-top)) 5vw clamp(26px,7vh,84px);text-align:center;
   animation:startIn .8s cubic-bezier(.2,1,.3,1) both;}
 @keyframes startIn{from{opacity:0;transform:translateY(20px) scale(.96);}to{opacity:1;transform:none;}}
 
-.start-logo{width:auto;height:clamp(96px,30vh,310px);max-width:86vw;display:block;
+.start-logo{width:auto;height:clamp(64px,22vh,190px);max-width:76vw;display:block;
   filter:drop-shadow(0 4px 16px #000b) drop-shadow(0 0 26px #ff9a2e55);
   animation:logoFlick 6s infinite, startFloat 5s ease-in-out infinite;}
 @keyframes startFloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-9px);}}
@@ -594,6 +616,114 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   border:2px solid #5a4a2e55;border-top-color:#5a4a2e;animation:startSpin .7s linear infinite;}
 @keyframes startSpin{to{transform:rotate(360deg);}}
 
+/* ---- boot loading screen -------------------------------------------------- *
+   Full-bleed "summoning the pantheon" sequence shown over EVERYTHING on first
+   mount (z 200, above the splash 100, transition 110, splash chrome 120 and the
+   sound popup 130) while assets preload. The controller cycles the status text,
+   drives the bar from real preload progress, holds up to 8s, then fade-zooms it
+   away (.done) as the home screen zooms in (.start-screen.reveal). */
+.ad-loading{position:fixed;inset:0;z-index:200;display:grid;place-items:center;
+  overflow:hidden;color:var(--ink);-webkit-tap-highlight-color:transparent;
+  background:radial-gradient(125% 92% at 50% 6%,#1a1030 0%,#0b0713 46%,#060409 100%);}
+.ad-loading.done{animation:adlOut .85s cubic-bezier(.5,0,.15,1) forwards;pointer-events:none;}
+@keyframes adlOut{0%{opacity:1;transform:scale(1);filter:blur(0);}
+  100%{opacity:0;transform:scale(1.16);filter:blur(5px);}}
+
+/* backdrop: neon grid + nebula + rising gold motes + vignette */
+.adl-bg{position:absolute;inset:0;pointer-events:none;}
+.adl-grid{position:absolute;inset:-2px;opacity:.5;
+  background-image:linear-gradient(#43e8ff14 1px,transparent 1px),
+    linear-gradient(90deg,#43e8ff14 1px,transparent 1px);
+  background-size:46px 46px;
+  -webkit-mask-image:radial-gradient(circle at 50% 42%,#000 0%,#0009 48%,transparent 76%);
+  mask-image:radial-gradient(circle at 50% 42%,#000 0%,#0009 48%,transparent 76%);
+  animation:adlGridDrift 20s linear infinite;}
+@keyframes adlGridDrift{to{background-position:46px 46px;}}
+.adl-nebula{position:absolute;inset:0;opacity:.85;filter:blur(6px);
+  background:radial-gradient(40% 34% at 22% 26%,#a64bff33,transparent 70%),
+    radial-gradient(46% 40% at 80% 74%,#43e8ff26,transparent 72%);}
+.adl-vignette{position:absolute;inset:0;
+  background:radial-gradient(120% 100% at 50% 46%,transparent 52%,#050308cc 100%);}
+.adl-motes{position:absolute;inset:0;overflow:hidden;}
+.adl-mote{position:absolute;bottom:-6%;border-radius:50%;opacity:0;
+  background:radial-gradient(circle,#fff3c0,#f4c64a 60%,transparent 70%);
+  box-shadow:0 0 8px #ffd87a;animation-name:adlRise;animation-timing-function:linear;
+  animation-iteration-count:infinite;}
+@keyframes adlRise{0%{transform:translateY(0) scale(.55);opacity:0;}
+  12%{opacity:.9;}86%{opacity:.6;}100%{transform:translateY(-112vh) scale(1);opacity:0;}}
+
+/* centred content stack */
+.adl-center{position:relative;z-index:2;display:flex;flex-direction:column;
+  align-items:center;gap:clamp(15px,3vh,28px);padding:26px;text-align:center;
+  animation:adlIn .7s cubic-bezier(.2,1,.3,1) both;}
+@keyframes adlIn{from{opacity:0;transform:translateY(14px) scale(.98);}to{opacity:1;transform:none;}}
+
+.adl-logo{width:auto;height:clamp(44px,12vh,100px);max-width:72vw;display:block;
+  filter:drop-shadow(0 3px 14px #000b) drop-shadow(0 0 22px #ff9a2e55);
+  animation:startFloat 5s ease-in-out infinite;}
+
+/* spinning rune loader */
+.adl-ring{position:relative;width:clamp(140px,33vmin,216px);aspect-ratio:1;
+  display:grid;place-items:center;}
+.adl-ring svg{position:absolute;inset:0;width:100%;height:100%;transform-origin:50% 50%;}
+.adl-ring .r-1{animation:adlSpin 9s linear infinite;}
+.adl-ring .r-2{animation:adlSpin 6s linear infinite reverse;}
+.adl-ring .r-3{animation:adlSpin 3.6s linear infinite;}
+@keyframes adlSpin{to{transform:rotate(360deg);}}
+.adl-core{position:relative;width:44%;aspect-ratio:1;border-radius:50%;overflow:hidden;
+  background:radial-gradient(circle at 50% 36%,#fff8dd 0%,#f6da8c 26%,#e6bb55 52%,#b9821f 78%,#6b470f 100%);
+  box-shadow:0 0 30px #ffd87a99,0 0 62px #43e8ff33,inset 0 2px 6px #ffffff88,inset 0 -6px 14px #00000055;
+  animation:adlPulse 2.2s ease-in-out infinite;}
+@keyframes adlPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.06);}}
+.adl-core::before{content:"";position:absolute;inset:-32%;mix-blend-mode:screen;
+  background:conic-gradient(from 0deg,transparent 0 76%,#fff9e0cc 88%,transparent 100%);
+  animation:adlSpin 3.2s linear infinite;}
+.adl-core::after{content:"";position:absolute;inset:0;border-radius:50%;
+  box-shadow:inset 0 0 22px #7a5210aa;}
+
+/* changing status line (controller re-triggers the fade on each new text) */
+.adl-status{font-family:var(--font-fx);text-transform:uppercase;letter-spacing:.28em;
+  font-size:clamp(11px,1.9vmin,15px);color:#ffe9b8;min-height:1.4em;
+  text-shadow:0 0 10px #43e8ff66,0 1px 2px #000;animation:adlStatusIn .5s ease;}
+@keyframes adlStatusIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+/* progress bar */
+.adl-bar-wrap{width:min(440px,76vw);display:flex;flex-direction:column;gap:9px;}
+.adl-bar{position:relative;height:12px;border-radius:999px;overflow:hidden;
+  border:1.5px solid #8a6a1f;background:#12090f;
+  box-shadow:inset 0 1px 3px #000a,0 0 12px #43e8ff22;}
+.adl-fill{height:100%;width:0;border-radius:999px;
+  background:linear-gradient(90deg,#43e8ff,#f6da8c 46%,#e6bb55);
+  box-shadow:0 0 14px #ffd87a99;transition:width .25s ease;}
+.adl-bar::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(90deg,transparent 0%,#ffffff55 50%,transparent 100%);
+  transform:translateX(-100%);animation:adlSheen 1.8s ease-in-out infinite;}
+@keyframes adlSheen{0%{transform:translateX(-100%);}60%,100%{transform:translateX(100%);}}
+.adl-bar-info{display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--font-fx);font-size:clamp(9px,1.3vmin,12px);letter-spacing:.16em;
+  color:#8fb9c4;}
+.adl-pct{color:var(--neon-2);text-shadow:0 0 8px #43e8ff66;}
+
+/* thematic info grid */
+.adl-grid-info{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+  width:min(440px,88vw);}
+.adl-grid-info .cell{padding:8px 6px;border-radius:8px;text-align:center;
+  border:1px solid #ffffff14;background:linear-gradient(180deg,#ffffff0a,#00000033);
+  box-shadow:inset 0 0 12px #43e8ff10;}
+.adl-grid-info .k{font-family:var(--font-fx);font-size:8.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:#8fb9c4;}
+.adl-grid-info .v{font-family:var(--font-head);font-size:clamp(10px,1.5vmin,13px);
+  color:#ffe9b8;margin-top:2px;white-space:nowrap;}
+
+/* mobile-webview perf: trim the loader's heaviest continuous work — the blurred
+   nebula (full-screen filter re-raster), the drifting grid, and half the motes.
+   The rings, core and bar keep their cheap transform-based animation. */
+@media (max-width:820px){
+  .adl-nebula{filter:none;opacity:.55;}
+  .adl-grid{animation:none;}
+  .adl-mote:nth-child(2n){display:none;}
+}
+
 /* ---- start → game transition --------------------------------------------- *
    On START the transition video (z 110) FADES IN over the splash, plays IN FULL,
    then FADES OUT to reveal the game (race) screen beneath it — a smooth opacity
@@ -603,10 +733,27 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .transition-fx.show{opacity:1;}
 .transition-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;}
 
-/* respect reduced-motion: drop the looping splash flourishes (the crossfade
-   itself is a gentle opacity fade, fine to keep). */
+/* respect reduced-motion: drop the splash flourishes AND the in-game ambient/idle
+   loops (scanlines, rune-ring rotation, logo flicker, the pulsing How-to-play
+   button, the turbo hint, the idle spin-button breathing). Gameplay-feedback
+   animations (symbol drops, cascades, win pops, the active spin rotation) are
+   kept — they convey state, not decoration. The crossfade is a gentle opacity
+   fade, fine to keep. */
 @media (prefers-reduced-motion: reduce){
-  .start-logo,.start-btn{animation:none;}
+  .start-logo,.start-btn,
+  .logo,
+  .bg-grid::after,
+  .rune-ring .rr-outer,.rune-ring .rr-mid,.rune-ring .rr-inner,
+  .icon-btn.info-btn,
+  .turbo-hint,
+  .round-btn.spin:not(.spinning):not(.autoact) .spin-frame,
+  /* loading screen: drop the spins, drift, motes and core shimmer */
+  .adl-logo,.adl-grid,.adl-mote,
+  .adl-ring .r-1,.adl-ring .r-2,.adl-ring .r-3,
+  .adl-core,.adl-core::before,.adl-bar::after{animation:none;}
+  /* keep the hand-off readable: plain fades, no zoom/blur */
+  .ad-loading.done{animation:fade .4s ease reverse forwards;}
+  .start-screen.reveal{animation:fade .4s ease;}
 }
 
 /* ---- sound settings popup (Music + Effects volume sliders) ---------------- */
@@ -643,17 +790,24 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
      short phones — tall phones stay width-bound at 92cqw and are unaffected). */
   .board{--board-size:clamp(130px,min(42cqh,92cqw),600px);}
 
-  /* top bar: compact logo + a vertical help pill (question logo above the
-     "HOW TO PLAY" caption), kept clear of the logo so they never overlap */
+  /* top bar: compact logo + icon-only round buttons. The text labels wrapped and
+     looked cramped on phones, so we drop them and show just the icon. HOME, the
+     profile avatar and HOW-TO-PLAY are all rendered as equal-size gold discs. */
   .topbar{padding:max(6px,1.6vmin) 3vw 0;}
   .logo img{height:clamp(44px,min(10cqh,18vmin),104px);max-width:48vw;}
   .topbar-left{left:2.5vw;}
   .topbar-right{right:2.5vw;gap:2vw;}
-  .icon-btn.info-btn,.icon-btn.back-btn{flex-direction:column;gap:3px;min-width:0;
-    padding:6px 8px;font-size:9px;letter-spacing:.4px;line-height:1.08;}
-  .info-ico{width:clamp(19px,5vmin,26px);height:clamp(19px,5vmin,26px);}
-  .back-ico{width:clamp(17px,4.6vmin,24px);height:clamp(17px,4.6vmin,24px);}
-  .info-txt,.back-txt{white-space:normal;text-align:center;max-width:5.5em;}
+  .icon-btn.info-btn,.icon-btn.back-btn{
+    flex-direction:row;gap:0;min-width:0;padding:0;border-radius:50%;
+    width:clamp(42px,12vmin,54px);height:clamp(42px,12vmin,54px);}
+  .info-txt,.back-txt{display:none;}                 /* icon-only on phones */
+  .back-ico{width:clamp(20px,5.8vmin,28px);height:clamp(20px,5.8vmin,28px);}
+  /* larger "?" image inside the HOW TO PLAY disc (button size unchanged) */
+  .info-ico{width:clamp(28px,8.4vmin,40px);height:clamp(28px,8.4vmin,40px);}
+  /* enlarge the profile avatar to match the round buttons */
+  .player-chip{padding:0;max-width:none;}
+  .pc-avatar{width:clamp(42px,12vmin,54px);height:clamp(42px,12vmin,54px);
+    font-size:clamp(15px,4.4vmin,22px);}
 
   /* free-game banner shrinks so it can't overflow a narrow screen */
   .free-banner{gap:2.5vw;padding:5px 3vw;font-size:clamp(11px,3vmin,15px);}
@@ -661,7 +815,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 
   /* HUD re-flows into three rows:
        row 1  [ balance ][ win ]
-       row 2  [ −  Bet Rs 3  + ]                       (full width, single line)
+       row 2  [ −  Bet PTS 3  + ]                       (full width, single line)
        row 3  [ turbo  auto ][ SPIN ][ sound  history ]   (SPIN dead-centre)   */
   .hud{
     display:grid;width:100%;gap:1.4vmin 2vw;
@@ -670,7 +824,10 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
       "balance balance balance win    win    win"
       "bet     bet     bet     bet    bet    bet"
       "turbo   auto    spin    spin   snd    hist";
-    margin:0 auto clamp(6px,1.4vmin,16px);padding:0 3vw;
+    /* lift the controls clear of the bottom edge on phones: a visible gap plus
+       the device's home-indicator / nav-bar inset (safe-area-inset-bottom). The
+       flex:1 board-wrap above absorbs this, so nothing is clipped. */
+    margin:0 auto calc(clamp(16px,4vh,38px) + env(safe-area-inset-bottom));padding:0 3vw;
   }
   .meter.balance{grid-area:balance;}
   .meter.win{grid-area:win;}
@@ -684,7 +841,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   #btnSound{grid-area:snd;justify-self:center;}
   #btnHistory{grid-area:hist;justify-self:center;}
 
-  /* bet block: full-width row with the amount on one line (− [Bet Rs 3] +),
+  /* bet block: full-width row with the amount on one line (− [Bet PTS 3] +),
      which is shorter than the old stacked label/value */
   .bet-block{grid-area:bet;flex-direction:row;justify-content:center;width:100%;
     gap:clamp(10px,4vw,26px);min-height:clamp(34px,9vmin,46px);padding:clamp(3px,0.8vmin,6px) 3vw;}

@@ -284,7 +284,7 @@ function createEngine(opts: EngineOptions = {}): Engine {
       const freeMode = st.inFree;
 
       if (!freeMode) {
-        st.balance -= bet;       // base spins cost a bet; free spins are free
+        st.balance = Math.max(0, st.balance - bet);   // base spins cost a bet; clamp so a mis-timed call can't go negative
       } else {
         st.freeLeft--;
       }
@@ -368,8 +368,14 @@ function createEngine(opts: EngineOptions = {}): Engine {
         st.mult = 1;
         st.goldenTreasureUsed = false;
       } else if (freeMode) {
-        if (total > 0) st.mult = Math.min(MAX_MULT, st.mult + 1);   // multiplier climbs each winning free spin
+        // Apply any retrigger first so the climb check below sees the true
+        // remaining count (incl. bonus games), then climb the multiplier for the
+        // NEXT free spin — but only while the session actually continues, so the
+        // final free spin never reports a multiplier that is never applied (the
+        // win itself uses `spinMult`, captured before this, so payouts are
+        // unchanged — this only fixes the displayed/returned multiplier).
         if (extraFree > 0) { st.freeLeft += extraFree; st.freeTotal += extraFree; }
+        if (total > 0 && st.freeLeft > 0) st.mult = Math.min(MAX_MULT, st.mult + 1);
       }
 
       // enforce the published payout cap (10,000,000 / 10,000x bet)
